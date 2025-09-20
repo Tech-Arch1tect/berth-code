@@ -16,12 +16,31 @@ export class StackTreeItem extends vscode.TreeItem {
         if (fileEntry) {
             let tooltip = `${fileEntry.name}\nSize: ${fileEntry.displaySize}\nModified: ${fileEntry.modTime}\nPermissions: ${fileEntry.mode}`;
 
-            if (fileEntry.owner || fileEntry.group) {
-                const ownerInfo = fileEntry.owner || `uid:${fileEntry.ownerId || 'unknown'}`;
-                const groupInfo = fileEntry.group || `gid:${fileEntry.groupId || 'unknown'}`;
+            if (fileEntry.ownerId !== undefined || fileEntry.groupId !== undefined || fileEntry.owner || fileEntry.group) {
+                let ownerInfo = '';
+                let groupInfo = '';
+
+                if (fileEntry.owner && fileEntry.ownerId !== undefined) {
+                    ownerInfo = `${fileEntry.owner} (${fileEntry.ownerId})`;
+                } else if (fileEntry.owner) {
+                    ownerInfo = fileEntry.owner;
+                } else if (fileEntry.ownerId !== undefined) {
+                    ownerInfo = `uid:${fileEntry.ownerId}`;
+                } else {
+                    ownerInfo = 'unknown';
+                }
+
+                if (fileEntry.group && fileEntry.groupId !== undefined) {
+                    groupInfo = `${fileEntry.group} (${fileEntry.groupId})`;
+                } else if (fileEntry.group) {
+                    groupInfo = fileEntry.group;
+                } else if (fileEntry.groupId !== undefined) {
+                    groupInfo = `gid:${fileEntry.groupId}`;
+                } else {
+                    groupInfo = 'unknown';
+                }
+
                 tooltip += `\nOwner: ${ownerInfo}\nGroup: ${groupInfo}`;
-            } else if (fileEntry.ownerId !== undefined || fileEntry.groupId !== undefined) {
-                tooltip += `\nOwner: uid:${fileEntry.ownerId || 'unknown'}\nGroup: gid:${fileEntry.groupId || 'unknown'}`;
             }
 
             this.tooltip = tooltip;
@@ -410,6 +429,160 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
             vscode.window.showInformationMessage(`File downloaded to ${saveUri.fsPath}`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    public async chmodFile(item: StackTreeItem): Promise<void> {
+        if (!this.currentServer || !this.currentStack || !item.fileEntry) {
+            return;
+        }
+
+        const currentMode = item.fileEntry.mode || '0644';
+        const newMode = await vscode.window.showInputBox({
+            prompt: `Enter new permissions for "${item.fileEntry.name}"`,
+            placeHolder: 'e.g., 0755, 644, 755',
+            value: currentMode,
+            validateInput: (value) => {
+                if (!/^[0-7]{3,4}$/.test(value)) {
+                    return 'Please enter valid octal permissions (e.g., 755, 0644)';
+                }
+                return null;
+            }
+        });
+
+        if (!newMode || newMode === currentMode) {
+            return;
+        }
+
+        let recursive = false;
+        if (item.fileEntry.isDirectory) {
+            const choice = await vscode.window.showQuickPick(
+                [
+                    { label: 'Apply to this folder only', value: false },
+                    { label: 'Apply recursively to all contents', value: true }
+                ],
+                {
+                    placeHolder: 'Choose how to apply permissions',
+                    ignoreFocusOut: true
+                }
+            );
+
+            if (!choice) {
+                return;
+            }
+            recursive = choice.value;
+        }
+
+        try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
+            await this.filesService.chmodFile(this.currentServer.id, this.currentStack.name, {
+                path: item.fileEntry.path,
+                mode: newMode.startsWith('0') ? newMode : `0${newMode}`,
+                recursive: recursive
+            });
+
+            this.refresh();
+            vscode.window.showInformationMessage(
+                `Permissions changed to ${newMode} for "${item.fileEntry.name}"${recursive ? ' (recursive)' : ''}`
+            );
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to change permissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    public async chownFile(item: StackTreeItem): Promise<void> {
+        if (!this.currentServer || !this.currentStack || !item.fileEntry) {
+            return;
+        }
+
+        const currentOwner = item.fileEntry.owner || `uid:${item.fileEntry.ownerId || 'unknown'}`;
+        const currentGroup = item.fileEntry.group || `gid:${item.fileEntry.groupId || 'unknown'}`;
+
+        const ownerInput = await vscode.window.showInputBox({
+            prompt: `Enter new owner ID for "${item.fileEntry.name}" (leave empty to keep current: ${currentOwner})`,
+            placeHolder: 'e.g., 1000',
+            value: item.fileEntry.ownerId?.toString() || ''
+        });
+
+        if (ownerInput === undefined) {
+            return;
+        }
+
+        const groupInput = await vscode.window.showInputBox({
+            prompt: `Enter new group ID for "${item.fileEntry.name}" (leave empty to keep current: ${currentGroup})`,
+            placeHolder: 'e.g., 100',
+            value: item.fileEntry.groupId?.toString() || ''
+        });
+
+        if (groupInput === undefined) {
+            return;
+        }
+
+        if (!ownerInput.trim() && !groupInput.trim()) {
+            vscode.window.showInformationMessage('At least one of owner or group must be specified');
+            return;
+        }
+
+        let recursive = false;
+        if (item.fileEntry.isDirectory) {
+            const choice = await vscode.window.showQuickPick(
+                [
+                    { label: 'Apply to this folder only', value: false },
+                    { label: 'Apply recursively to all contents', value: true }
+                ],
+                {
+                    placeHolder: 'Choose how to apply ownership',
+                    ignoreFocusOut: true
+                }
+            );
+
+            if (!choice) {
+                return;
+            }
+            recursive = choice.value;
+        }
+
+        try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
+            const ownerId = ownerInput.trim() ? parseInt(ownerInput.trim()) : undefined;
+            const groupId = groupInput.trim() ? parseInt(groupInput.trim()) : undefined;
+
+            if (ownerInput.trim() && isNaN(ownerId!)) {
+                vscode.window.showErrorMessage('Owner must be a numeric user ID');
+                return;
+            }
+
+            if (groupInput.trim() && isNaN(groupId!)) {
+                vscode.window.showErrorMessage('Group must be a numeric group ID');
+                return;
+            }
+
+
+            await this.filesService.chownFile(this.currentServer.id, this.currentStack.name, {
+                path: item.fileEntry.path,
+                owner_id: ownerId,
+                group_id: groupId,
+                recursive: recursive
+            });
+
+            this.refresh();
+            const changes = [];
+            if (ownerId !== undefined) changes.push(`owner: ${ownerId}`);
+            if (groupId !== undefined) changes.push(`group: ${groupId}`);
+
+            vscode.window.showInformationMessage(
+                `Ownership changed (${changes.join(', ')}) for "${item.fileEntry.name}"${recursive ? ' (recursive)' : ''}`
+            );
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to change ownership: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 }

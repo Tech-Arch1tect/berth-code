@@ -64,8 +64,8 @@ export interface ChmodRequest {
 
 export interface ChownRequest {
     path: string;
-    ownerId?: number;
-    groupId?: number;
+    owner_id?: number;
+    group_id?: number;
     recursive: boolean;
 }
 

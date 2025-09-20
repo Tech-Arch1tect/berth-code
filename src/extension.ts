@@ -84,6 +84,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
         vscode.commands.registerCommand('berth.openFile', (fileEntry) => {
             authCommands.openFile(fileEntry);
+        }),
+
+        vscode.commands.registerCommand('berth.chmodFile', (item) => {
+            if (item) {
+                treeDataProvider.chmodFile(item);
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.chownFile', (item) => {
+            if (item) {
+                treeDataProvider.chownFile(item);
+            }
         })
     ];
 

@@ -83,6 +83,18 @@
         "title": "Download File",
         "category": "Berth",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "berth.chmodFile",
+        "title": "Change Permissions (chmod)",
+        "category": "Berth",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "berth.chownFile",
+        "title": "Change Ownership (chown)",
+        "category": "Berth",
+        "icon": "$(account)"
       }
     ],
     "views": {
@@ -167,6 +179,16 @@
           "command": "berth.renameFile",
           "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
           "group": "4_edit"
+        },
+        {
+          "command": "berth.chmodFile",
+          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "group": "4_permissions"
+        },
+        {
+          "command": "berth.chownFile",
+          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "group": "4_permissions"
         },
         {
           "command": "berth.deleteFile",
