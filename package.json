@@ -1,23 +1,183 @@
 {
   "name": "berth-code",
-  "displayName": "berth-code",
-  "description": "",
+  "displayName": "Berth Stack Manager",
+  "description": "Manage Docker stack files and configurations through Berth server",
   "version": "0.0.1",
+  "publisher": "berth",
   "engines": {
     "vscode": "^1.104.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "berth-code.helloWorld",
-        "title": "Hello World"
+        "command": "berth.login",
+        "title": "Login to Berth",
+        "category": "Berth"
+      },
+      {
+        "command": "berth.logout",
+        "title": "Logout from Berth",
+        "category": "Berth"
+      },
+      {
+        "command": "berth.refreshStacks",
+        "title": "Refresh Stacks",
+        "category": "Berth",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "berth.selectServer",
+        "title": "Select Server",
+        "category": "Berth"
+      },
+      {
+        "command": "berth.selectStack",
+        "title": "Select Stack",
+        "category": "Berth"
+      },
+      {
+        "command": "berth.createFile",
+        "title": "New File",
+        "category": "Berth",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "berth.createFolder",
+        "title": "New Folder",
+        "category": "Berth",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "berth.deleteFile",
+        "title": "Delete",
+        "category": "Berth"
+      },
+      {
+        "command": "berth.renameFile",
+        "title": "Rename",
+        "category": "Berth"
+      },
+      {
+        "command": "berth.uploadFile",
+        "title": "Upload File",
+        "category": "Berth",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "berth.downloadFile",
+        "title": "Download File",
+        "category": "Berth",
+        "icon": "$(cloud-download)"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "berthStackExplorer",
+          "name": "Berth Stack Files",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "berth",
+          "title": "Berth",
+          "icon": "$(server)"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "berthStackExplorer",
+        "contents": "You are not connected to a Berth server.\n[Login to Berth](command:berth.login)\nTo learn more about Berth, [read the documentation](https://github.com/tech-arch1tect/berth)."
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "berth.refreshStacks",
+          "when": "view == berthStackExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "berth.selectServer",
+          "when": "view == berthStackExplorer",
+          "group": "1_server"
+        },
+        {
+          "command": "berth.selectStack",
+          "when": "view == berthStackExplorer",
+          "group": "1_server"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "berth.createFile",
+          "when": "view == berthStackExplorer && viewItem == folder",
+          "group": "1_creation"
+        },
+        {
+          "command": "berth.createFolder",
+          "when": "view == berthStackExplorer && viewItem == folder",
+          "group": "1_creation"
+        },
+        {
+          "command": "berth.uploadFile",
+          "when": "view == berthStackExplorer && viewItem == folder",
+          "group": "2_upload"
+        },
+        {
+          "command": "berth.downloadFile",
+          "when": "view == berthStackExplorer && viewItem == file",
+          "group": "3_download"
+        },
+        {
+          "command": "berth.renameFile",
+          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "group": "4_edit"
+        },
+        {
+          "command": "berth.deleteFile",
+          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "group": "5_delete"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "berth.refreshStacks"
+        },
+        {
+          "command": "berth.selectServer"
+        },
+        {
+          "command": "berth.selectStack"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Berth",
+      "properties": {
+        "berth.serverUrl": {
+          "type": "string",
+          "default": "https://localhost:8080",
+          "description": "URL of the Berth server"
+        },
+        "berth.trustSelfSignedCertificates": {
+          "type": "boolean",
+          "default": true,
+          "description": "Trust self-signed certificates (useful for development)"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

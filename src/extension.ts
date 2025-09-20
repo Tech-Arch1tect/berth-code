@@ -1,26 +1,154 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { AuthService } from './services/AuthService';
+import { ApiClient } from './services/ApiClient';
+import { StackTreeDataProvider } from './providers/StackTreeDataProvider';
+import { BerthFileSystemProvider } from './providers/BerthFileSystemProvider';
+import { AuthCommands } from './commands/AuthCommands';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "berth-code" is now active!');
+    const apiClient = new ApiClient();
+    const authService = new AuthService(context.secrets, context);
+    const treeDataProvider = new StackTreeDataProvider(authService, apiClient);
+    const fileSystemProvider = new BerthFileSystemProvider(apiClient);
+    const authCommands = new AuthCommands(authService, apiClient, treeDataProvider);
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('berth-code.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from berth-code!');
-	});
+    authService.setTokenRefreshCallback(() => authService.refreshAccessToken());
+    apiClient.setTokenRefreshCallback(() => authService.refreshAccessToken());
 
-	context.subscriptions.push(disposable);
+    const syncTokenToApiClient = () => {
+        const token = authService.getAccessToken();
+        if (token) {
+            apiClient.setAuthToken(token);
+        } else {
+            apiClient.clearAuthToken();
+        }
+    };
+
+    const isAuthenticated = await authService.initializeFromStorage();
+    if (isAuthenticated) {
+        syncTokenToApiClient();
+        const isValid = await authService.checkAuthStatus();
+        if (!isValid) {
+
+        }
+    }
+
+    const treeView = vscode.window.createTreeView('berthStackExplorer', {
+        treeDataProvider: treeDataProvider,
+        showCollapseAll: true
+    });
+
+    const fileSystemProviderDisposable = vscode.workspace.registerFileSystemProvider('berth', fileSystemProvider, { isCaseSensitive: true });
+
+    const commands = [
+        vscode.commands.registerCommand('berth.login', () => authCommands.login()),
+        vscode.commands.registerCommand('berth.logout', () => authCommands.logout()),
+        vscode.commands.registerCommand('berth.selectServer', () => authCommands.selectServer()),
+        vscode.commands.registerCommand('berth.selectStack', () => authCommands.selectStack()),
+        vscode.commands.registerCommand('berth.refreshStacks', () => treeDataProvider.refresh()),
+
+        vscode.commands.registerCommand('berth.createFile', (item) => {
+            if (item && item.fileEntry && item.fileEntry.isDirectory) {
+                treeDataProvider.createFile(item);
+            } else {
+                treeDataProvider.createFile();
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.createFolder', (item) => {
+            if (item && item.fileEntry && item.fileEntry.isDirectory) {
+                treeDataProvider.createFolder(item);
+            } else {
+                treeDataProvider.createFolder();
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.deleteFile', (item) => {
+            if (item) {
+                treeDataProvider.deleteFile(item);
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.renameFile', (item) => {
+            if (item) {
+                treeDataProvider.renameFile(item);
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.uploadFile', (item) => {
+            if (item && item.fileEntry && item.fileEntry.isDirectory) {
+                treeDataProvider.uploadFile(item);
+            } else {
+                treeDataProvider.uploadFile();
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.downloadFile', (item) => {
+            if (item) {
+                treeDataProvider.downloadFile(item);
+            }
+        }),
+
+        vscode.commands.registerCommand('berth.openFile', (fileEntry) => {
+            authCommands.openFile(fileEntry);
+        })
+    ];
+
+
+    const configChangeHandler = vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('berth.serverUrl') ||
+            event.affectsConfiguration('berth.trustSelfSignedCertificates')) {
+            const newApiClient = new ApiClient();
+            if (authService.getAccessToken()) {
+                newApiClient.setAuthToken(authService.getAccessToken()!);
+            }
+            vscode.window.showInformationMessage('Configuration updated. Please restart the extension for changes to take effect.');
+        }
+    });
+
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBarItem.command = 'berth.login';
+
+    const updateStatusBar = () => {
+        if (authService.isAuthenticated()) {
+            const user = authService.getCurrentUser();
+            const server = treeDataProvider.getCurrentServer();
+            const stack = treeDataProvider.getCurrentStack();
+
+            let statusText = `$(server) Berth: ${user?.username}`;
+            if (server) {
+                statusText += ` @ ${server.name}`;
+            }
+            if (stack) {
+                statusText += ` / ${stack.name}`;
+            }
+
+            statusBarItem.text = statusText;
+            statusBarItem.tooltip = 'Connected to Berth';
+        } else {
+            statusBarItem.text = '$(server) Berth: Not connected';
+            statusBarItem.tooltip = 'Click to login to Berth';
+        }
+        statusBarItem.show();
+    };
+
+    updateStatusBar();
+
+    treeDataProvider.onDidChangeTreeData(() => {
+        updateStatusBar();
+    });
+
+    context.subscriptions.push(
+        treeView,
+        fileSystemProviderDisposable,
+        configChangeHandler,
+        statusBarItem,
+        ...commands
+    );
+
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+
+}
