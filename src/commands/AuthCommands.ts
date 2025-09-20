@@ -230,7 +230,11 @@ export class AuthCommands {
             return;
         }
 
-        try {         
+        if (fileEntry.isDirectory) {
+            return;
+        }
+
+        try {
             const uri = vscode.Uri.parse(`berth://${currentServer.id}/${currentStack.name}/${fileEntry.path}`);
             const document = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(document);

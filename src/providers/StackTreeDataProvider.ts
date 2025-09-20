@@ -20,6 +20,7 @@ export class StackTreeItem extends vscode.TreeItem {
             if (fileEntry.isDirectory) {
                 this.iconPath = new vscode.ThemeIcon('folder');
                 this.contextValue = 'folder';
+                this.command = undefined;
             } else {
                 this.iconPath = this.getFileIcon(fileEntry.extension);
                 this.contextValue = 'file';
@@ -134,6 +135,10 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
 
             const items: StackTreeItem[] = [];
 
+            if (!listing || !listing.entries || listing.entries.length === 0) {
+                return [];
+            }
+
             const sortedEntries = listing.entries.sort((a, b) => {
                 if (a.isDirectory && !b.isDirectory) {return -1;}
                 if (!a.isDirectory && b.isDirectory) {return 1;}
@@ -141,6 +146,10 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
             });
 
             for (const entry of sortedEntries) {
+                if (!entry || !entry.name) {
+                    continue;
+                }
+
                 const collapsibleState = entry.isDirectory
                     ? vscode.TreeItemCollapsibleState.Collapsed
                     : vscode.TreeItemCollapsibleState.None;

@@ -14,32 +14,27 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
         return this._onDidChangeFile.event;
     }
 
-    watch(uri: vscode.Uri, options: { recursive: boolean; excludes: string[]; }): vscode.Disposable {
+    watch(): vscode.Disposable {
         return new vscode.Disposable(() => {});
     }
 
     stat(uri: vscode.Uri): vscode.FileStat | Thenable<vscode.FileStat> {
-        return {
-            type: vscode.FileType.File,
-            ctime: Date.now(),
-            mtime: Date.now(),
-            size: 0
-        };
+        return this.getFileStat(uri);
     }
 
     readDirectory(uri: vscode.Uri): [string, vscode.FileType][] | Thenable<[string, vscode.FileType][]> {
+        return this.readDirectoryContents(uri);
+    }
+
+    createDirectory(): void | Thenable<void> {
         throw new Error('Not implemented');
     }
 
-    createDirectory(uri: vscode.Uri): void | Thenable<void> {
+    delete(): void | Thenable<void> {
         throw new Error('Not implemented');
     }
 
-    delete(uri: vscode.Uri, options: { recursive: boolean; }): void | Thenable<void> {
-        throw new Error('Not implemented');
-    }
-
-    rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean; }): void | Thenable<void> {
+    rename(): void | Thenable<void> {
         throw new Error('Not implemented');
     }
 
@@ -47,7 +42,7 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
         return this.readFileContent(uri);
     }
 
-    writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean; overwrite: boolean; }): void | Thenable<void> {
+    writeFile(uri: vscode.Uri, content: Uint8Array): void | Thenable<void> {
         return this.writeFileContent(uri, content);
     }
 
@@ -67,9 +62,17 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
                 throw new Error('Invalid server ID in URI');
             }
 
+            const stat = await this.getFileStat(uri);
+            if (stat.type === vscode.FileType.Directory) {
+                throw vscode.FileSystemError.FileIsADirectory(uri);
+            }
+
             const fileContent = await this.filesService.readFile(serverId, stackName, filePath);
             return new TextEncoder().encode(fileContent.content);
         } catch (error) {
+            if (error instanceof vscode.FileSystemError) {
+                throw error;
+            }
             throw new Error(`Failed to load file: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
@@ -102,6 +105,78 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
             }]);
         } catch (error) {
             throw new Error(`Failed to save file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async getFileStat(uri: vscode.Uri): Promise<vscode.FileStat> {
+        try {
+            const pathParts = uri.path.split('/').filter(part => part.length > 0);
+
+            if (pathParts.length < 1) {
+                throw new Error('Invalid berth URI format');
+            }
+
+            const serverId = parseInt(uri.authority);
+            const stackName = pathParts[0];
+
+            if (isNaN(serverId)) {
+                throw new Error('Invalid server ID in URI');
+            }
+
+            if (pathParts.length === 1) {
+                return {
+                    type: vscode.FileType.Directory,
+                    ctime: Date.now(),
+                    mtime: Date.now(),
+                    size: 0
+                };
+            }
+
+            const parentPath = pathParts.slice(1, -1).join('/');
+            const fileName = pathParts[pathParts.length - 1];
+
+            const listing = await this.filesService.listDirectory(serverId, stackName, parentPath || undefined);
+
+            const entry = listing.entries.find(e => e.name === fileName);
+            if (entry) {
+                return {
+                    type: entry.isDirectory ? vscode.FileType.Directory : vscode.FileType.File,
+                    ctime: new Date(entry.modTime).getTime(),
+                    mtime: new Date(entry.modTime).getTime(),
+                    size: entry.size
+                };
+            }
+
+            throw new Error('File not found');
+        } catch (error) {
+            throw vscode.FileSystemError.FileNotFound(uri);
+        }
+    }
+
+    private async readDirectoryContents(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
+        try {
+            const pathParts = uri.path.split('/').filter(part => part.length > 0);
+
+            if (pathParts.length < 1) {
+                throw new Error('Invalid berth URI format');
+            }
+
+            const serverId = parseInt(uri.authority);
+            const stackName = pathParts[0];
+            const dirPath = pathParts.slice(1).join('/');
+
+            if (isNaN(serverId)) {
+                throw new Error('Invalid server ID in URI');
+            }
+
+            const listing = await this.filesService.listDirectory(serverId, stackName, dirPath || undefined);
+
+            return listing.entries.map(entry => [
+                entry.name,
+                entry.isDirectory ? vscode.FileType.Directory : vscode.FileType.File
+            ]);
+        } catch (error) {
+            throw new Error(`Failed to read directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 

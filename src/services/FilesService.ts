@@ -23,7 +23,31 @@ export class FilesService {
             await this.handleError(response, 'Failed to list directory');
         }
 
-        return await response.json() as DirectoryListing;
+        const rawData = await response.json() as any;
+
+        if (!rawData) {
+            return { path: '', entries: [] };
+        }
+
+        const transformedData: DirectoryListing = {
+            path: rawData.path || '',
+            entries: (rawData.entries || []).map((entry: any) => ({
+                name: entry.name || '',
+                path: entry.path || '',
+                isDirectory: entry.is_directory === true,
+                size: entry.size || 0,
+                displaySize: this.formatFileSize(entry.size || 0),
+                modTime: entry.mod_time || new Date().toISOString(),
+                mode: entry.mode || '0644',
+                ownerId: entry.owner_id,
+                groupId: entry.group_id,
+                owner: entry.owner,
+                group: entry.group,
+                extension: entry.name && entry.name.includes('.') ? entry.name.split('.').pop() : undefined
+            }))
+        };
+
+        return transformedData;
     }
 
     public async readFile(serverId: number, stackName: string, path: string): Promise<FileContent> {
@@ -154,5 +178,13 @@ export class FilesService {
         }
 
         throw new Error(`${errorMessage}: ${response.status}`);
+    }
+
+    private formatFileSize(bytes: number): string {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 }
