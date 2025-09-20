@@ -114,27 +114,22 @@
         {
           "command": "berth.refreshStacks",
           "when": "view == berthServers",
-          "group": "navigation"
-        },
-        {
-          "command": "berth.openStackInExplorer",
-          "when": "view == berthServers && berth.authenticated",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "berth.createFile",
           "when": "view == berthServers",
-          "group": "2_creation"
+          "group": "navigation@3"
         },
         {
           "command": "berth.createFolder",
           "when": "view == berthServers",
-          "group": "2_creation"
+          "group": "navigation@4"
         },
         {
           "command": "berth.uploadFile",
           "when": "view == berthServers",
-          "group": "3_upload"
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -225,28 +220,6 @@
         {
           "command": "berth.refreshStacks"
         }
-      ],
-      "view/title": [
-        {
-          "command": "berth.refreshStacks",
-          "when": "view == berthServers",
-          "group": "navigation@2"
-        },
-        {
-          "command": "berth.createFile",
-          "when": "view == berthServers",
-          "group": "navigation@3"
-        },
-        {
-          "command": "berth.createFolder",
-          "when": "view == berthServers",
-          "group": "navigation@4"
-        },
-        {
-          "command": "berth.uploadFile",
-          "when": "view == berthServers",
-          "group": "navigation@5"
-        }
       ]
     },
     "configuration": {
@@ -270,6 +243,7 @@
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
+    "package-vsix": "npm run package && vsce package",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -277,17 +251,18 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/vscode": "^1.104.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
-    "eslint": "^9.34.0",
-    "typescript": "^5.9.2",
-    "ts-loader": "^9.5.4",
-    "webpack": "^5.101.3",
-    "webpack-cli": "^6.0.1",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0",
+    "eslint": "^9.34.0",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.2",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
   }
 }
