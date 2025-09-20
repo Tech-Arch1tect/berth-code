@@ -14,7 +14,17 @@ export class StackTreeItem extends vscode.TreeItem {
         super(label, collapsibleState);
 
         if (fileEntry) {
-            this.tooltip = `${fileEntry.name}\nSize: ${fileEntry.displaySize}\nModified: ${fileEntry.modTime}\nPermissions: ${fileEntry.mode}`;
+            let tooltip = `${fileEntry.name}\nSize: ${fileEntry.displaySize}\nModified: ${fileEntry.modTime}\nPermissions: ${fileEntry.mode}`;
+
+            if (fileEntry.owner || fileEntry.group) {
+                const ownerInfo = fileEntry.owner || `uid:${fileEntry.ownerId || 'unknown'}`;
+                const groupInfo = fileEntry.group || `gid:${fileEntry.groupId || 'unknown'}`;
+                tooltip += `\nOwner: ${ownerInfo}\nGroup: ${groupInfo}`;
+            } else if (fileEntry.ownerId !== undefined || fileEntry.groupId !== undefined) {
+                tooltip += `\nOwner: uid:${fileEntry.ownerId || 'unknown'}\nGroup: gid:${fileEntry.groupId || 'unknown'}`;
+            }
+
+            this.tooltip = tooltip;
             this.description = fileEntry.isDirectory ? '' : fileEntry.displaySize;
 
             if (fileEntry.isDirectory) {
