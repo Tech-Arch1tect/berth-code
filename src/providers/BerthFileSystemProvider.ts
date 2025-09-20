@@ -26,16 +26,16 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
         return this.readDirectoryContents(uri);
     }
 
-    createDirectory(): void | Thenable<void> {
-        throw new Error('Not implemented');
+    createDirectory(uri: vscode.Uri): void | Thenable<void> {
+        return this.createDirectoryAtPath(uri);
     }
 
-    delete(): void | Thenable<void> {
-        throw new Error('Not implemented');
+    delete(uri: vscode.Uri): void | Thenable<void> {
+        return this.deleteAtPath(uri);
     }
 
-    rename(): void | Thenable<void> {
-        throw new Error('Not implemented');
+    rename(oldUri: vscode.Uri, newUri: vscode.Uri): void | Thenable<void> {
+        return this.renameAtPath(oldUri, newUri);
     }
 
     readFile(uri: vscode.Uri): Uint8Array | Thenable<Uint8Array> {
@@ -177,6 +177,113 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
             ]);
         } catch (error) {
             throw new Error(`Failed to read directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async createDirectoryAtPath(uri: vscode.Uri): Promise<void> {
+        try {
+            const pathParts = uri.path.split('/').filter(part => part.length > 0);
+
+            if (pathParts.length < 2) {
+                throw new Error('Invalid berth URI format');
+            }
+
+            const serverId = parseInt(uri.authority);
+            const stackName = pathParts[0];
+            const dirPath = pathParts.slice(1).join('/');
+
+            if (isNaN(serverId)) {
+                throw new Error('Invalid server ID in URI');
+            }
+
+            await this.filesService.createDirectory(serverId, stackName, {
+                path: dirPath
+            });
+
+            this._onDidChangeFile.fire([{
+                type: vscode.FileChangeType.Created,
+                uri: uri
+            }]);
+        } catch (error) {
+            throw new Error(`Failed to create directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async deleteAtPath(uri: vscode.Uri): Promise<void> {
+        try {
+            const pathParts = uri.path.split('/').filter(part => part.length > 0);
+
+            if (pathParts.length < 2) {
+                throw new Error('Invalid berth URI format');
+            }
+
+            const serverId = parseInt(uri.authority);
+            const stackName = pathParts[0];
+            const filePath = pathParts.slice(1).join('/');
+
+            if (isNaN(serverId)) {
+                throw new Error('Invalid server ID in URI');
+            }
+
+            await this.filesService.deleteFile(serverId, stackName, {
+                path: filePath
+            });
+
+            this._onDidChangeFile.fire([{
+                type: vscode.FileChangeType.Deleted,
+                uri: uri
+            }]);
+        } catch (error) {
+            throw new Error(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async renameAtPath(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
+        try {
+            const oldPathParts = oldUri.path.split('/').filter(part => part.length > 0);
+            const newPathParts = newUri.path.split('/').filter(part => part.length > 0);
+
+            if (oldPathParts.length < 2 || newPathParts.length < 2) {
+                throw new Error('Invalid berth URI format');
+            }
+
+            const serverId = parseInt(oldUri.authority);
+            const stackName = oldPathParts[0];
+            const oldPath = oldPathParts.slice(1).join('/');
+            const newPath = newPathParts.slice(1).join('/');
+
+            if (isNaN(serverId)) {
+                throw new Error('Invalid server ID in URI');
+            }
+
+            
+            if (oldUri.authority !== newUri.authority || oldPathParts[0] !== newPathParts[0]) {
+                throw new Error('Cannot move files between different servers or stacks');
+            }
+
+            if (!oldPath || !newPath) {
+                throw new Error('Invalid file paths for rename operation');
+            }
+
+            const renameRequest = {
+                oldPath: oldPath,
+                newPath: newPath
+            };
+
+            await this.filesService.renameFile(serverId, stackName, renameRequest);
+
+            this._onDidChangeFile.fire([
+                {
+                    type: vscode.FileChangeType.Deleted,
+                    uri: oldUri
+                },
+                {
+                    type: vscode.FileChangeType.Created,
+                    uri: newUri
+                }
+            ]);
+        } catch (error) {
+            throw new Error(`Failed to rename/move: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 

@@ -33,24 +33,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "berth.selectServer",
-        "title": "Select Server",
-        "category": "Berth",
-        "icon": "$(server)"
-      },
-      {
-        "command": "berth.selectStack",
-        "title": "Select Stack",
-        "category": "Berth",
-        "icon": "$(layers)"
-      },
-      {
-        "command": "berth.selectServerAndStack",
-        "title": "Select Server & Stack",
-        "category": "Berth",
-        "icon": "$(settings-gear)"
-      },
-      {
         "command": "berth.createFile",
         "title": "New File",
         "category": "Berth",
@@ -95,13 +77,19 @@
         "title": "Change Ownership (chown)",
         "category": "Berth",
         "icon": "$(account)"
+      },
+      {
+        "command": "berth.openStackInExplorer",
+        "title": "Open Stack in Explorer",
+        "category": "Berth",
+        "icon": "$(folder-opened)"
       }
     ],
     "views": {
-      "explorer": [
+      "berth": [
         {
-          "id": "berthStackExplorer",
-          "name": "Berth Stack Files",
+          "id": "berthServers",
+          "name": "Servers & Stacks",
           "visibility": "visible"
         }
       ]
@@ -117,123 +105,146 @@
     },
     "viewsWelcome": [
       {
-        "view": "berthStackExplorer",
-        "contents": "You are not connected to a Berth server.\n[Login to Berth](command:berth.login)\nTo learn more about Berth, [read the documentation](https://github.com/tech-arch1tect/berth)."
+        "view": "berthServers",
+        "contents": "Connect to a Berth server to manage your Docker stacks.\n\n[Login to Berth](command:berth.login)\n\nTo learn more about Berth, [read the documentation](https://github.com/tech-arch1tect/berth)."
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "berth.refreshStacks",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "navigation"
         },
         {
-          "command": "berth.selectServer",
-          "when": "view == berthStackExplorer",
-          "group": "1_server"
-        },
-        {
-          "command": "berth.selectStack",
-          "when": "view == berthStackExplorer",
-          "group": "1_server"
+          "command": "berth.openStackInExplorer",
+          "when": "view == berthServers && berth.authenticated",
+          "group": "navigation"
         },
         {
           "command": "berth.createFile",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "2_creation"
         },
         {
           "command": "berth.createFolder",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "2_creation"
         },
         {
           "command": "berth.uploadFile",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "3_upload"
         }
       ],
       "view/item/context": [
         {
           "command": "berth.createFile",
-          "when": "view == berthStackExplorer && viewItem == folder",
+          "when": "view == berthServers && viewItem == folder",
           "group": "1_creation"
         },
         {
           "command": "berth.createFolder",
-          "when": "view == berthStackExplorer && viewItem == folder",
+          "when": "view == berthServers && viewItem == folder",
           "group": "1_creation"
         },
         {
           "command": "berth.uploadFile",
-          "when": "view == berthStackExplorer && viewItem == folder",
+          "when": "view == berthServers && viewItem == folder",
           "group": "2_upload"
         },
         {
           "command": "berth.downloadFile",
-          "when": "view == berthStackExplorer && viewItem == file",
+          "when": "view == berthServers && viewItem == file",
           "group": "3_download"
         },
         {
           "command": "berth.renameFile",
-          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "when": "view == berthServers && viewItem =~ /^(file|folder)$/",
           "group": "4_edit"
         },
         {
           "command": "berth.chmodFile",
-          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "when": "view == berthServers && viewItem =~ /^(file|folder)$/",
           "group": "4_permissions"
         },
         {
           "command": "berth.chownFile",
-          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "when": "view == berthServers && viewItem =~ /^(file|folder)$/",
           "group": "4_permissions"
         },
         {
           "command": "berth.deleteFile",
-          "when": "view == berthStackExplorer && viewItem =~ /^(file|folder)$/",
+          "when": "view == berthServers && viewItem =~ /^(file|folder)$/",
+          "group": "5_delete"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "berth.createFile",
+          "when": "explorerResourceIsFolder && resourceScheme == berth",
+          "group": "1_creation"
+        },
+        {
+          "command": "berth.createFolder",
+          "when": "explorerResourceIsFolder && resourceScheme == berth",
+          "group": "1_creation"
+        },
+        {
+          "command": "berth.uploadFile",
+          "when": "explorerResourceIsFolder && resourceScheme == berth",
+          "group": "2_upload"
+        },
+        {
+          "command": "berth.downloadFile",
+          "when": "!explorerResourceIsFolder && resourceScheme == berth",
+          "group": "3_download"
+        },
+        {
+          "command": "berth.renameFile",
+          "when": "resourceScheme == berth",
+          "group": "4_edit"
+        },
+        {
+          "command": "berth.chmodFile",
+          "when": "resourceScheme == berth",
+          "group": "4_permissions"
+        },
+        {
+          "command": "berth.chownFile",
+          "when": "resourceScheme == berth",
+          "group": "4_permissions"
+        },
+        {
+          "command": "berth.deleteFile",
+          "when": "resourceScheme == berth",
           "group": "5_delete"
         }
       ],
       "commandPalette": [
         {
           "command": "berth.refreshStacks"
-        },
-        {
-          "command": "berth.selectServer"
-        },
-        {
-          "command": "berth.selectStack"
-        },
-        {
-          "command": "berth.selectServerAndStack"
         }
       ],
       "view/title": [
         {
-          "command": "berth.selectServerAndStack",
-          "when": "view == berthStackExplorer",
-          "group": "navigation@1"
-        },
-        {
           "command": "berth.refreshStacks",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "navigation@2"
         },
         {
           "command": "berth.createFile",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "navigation@3"
         },
         {
           "command": "berth.createFolder",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "navigation@4"
         },
         {
           "command": "berth.uploadFile",
-          "when": "view == berthStackExplorer",
+          "when": "view == berthServers",
           "group": "navigation@5"
         }
       ]

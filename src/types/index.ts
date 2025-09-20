@@ -78,6 +78,26 @@ export interface DirectoryStats {
     mostCommonGroup?: number;
 }
 
+export type BerthTreeItem = ServerTreeItem | StackTreeItem | FileTreeItem;
+
+export interface ServerTreeItem {
+    type: 'server';
+    server: Server;
+}
+
+export interface StackTreeItem {
+    type: 'stack';
+    server: Server;
+    stack: Stack;
+}
+
+export interface FileTreeItem {
+    type: 'file';
+    server: Server;
+    stack: Stack;
+    fileEntry: FileEntry;
+}
+
 export interface Server {
     id: number;
     name: string;
@@ -101,15 +121,6 @@ export interface Service {
     ports: string[];
 }
 
-export interface StackTreeItem {
-    label: string;
-    resourceUri?: vscode.Uri;
-    contextValue: string;
-    collapsibleState: vscode.TreeItemCollapsibleState;
-    iconPath?: vscode.ThemeIcon;
-    tooltip?: string;
-    command?: vscode.Command;
-}
 
 export interface BerthConfig {
     serverUrl: string;

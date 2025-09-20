@@ -1,15 +1,17 @@
 import * as vscode from 'vscode';
 import { AuthService } from './services/AuthService';
 import { ApiClient } from './services/ApiClient';
-import { StackTreeDataProvider } from './providers/StackTreeDataProvider';
+import { FilesService } from './services/FilesService';
+import { BerthTreeDataProvider } from './providers/BerthTreeDataProvider';
 import { BerthFileSystemProvider } from './providers/BerthFileSystemProvider';
+import { BerthFileDecorationProvider } from './providers/BerthFileDecorationProvider';
 import { AuthCommands } from './commands/AuthCommands';
 
 export async function activate(context: vscode.ExtensionContext) {
 
     const apiClient = new ApiClient();
     const authService = new AuthService(context.secrets, context);
-    const treeDataProvider = new StackTreeDataProvider(authService, apiClient);
+    const treeDataProvider = new BerthTreeDataProvider(authService, apiClient);
     const fileSystemProvider = new BerthFileSystemProvider(apiClient);
     const authCommands = new AuthCommands(authService, apiClient, treeDataProvider);
 
@@ -25,60 +27,166 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
-    const treeView = vscode.window.createTreeView('berthStackExplorer', {
+    const treeView = vscode.window.createTreeView('berthServers', {
         treeDataProvider: treeDataProvider,
         showCollapseAll: true
     });
 
     const fileSystemProviderDisposable = vscode.workspace.registerFileSystemProvider('berth', fileSystemProvider, { isCaseSensitive: true });
 
+    
+    async function handleExplorerCommand(command: string, uri: vscode.Uri): Promise<void> {
+        try {
+            const pathParts = uri.path.split('/').filter(p => p);
+
+            if (pathParts.length < 1) {
+                vscode.window.showErrorMessage('Invalid berth URI format');
+                return;
+            }
+
+            const serverId = parseInt(uri.authority);
+            const stackName = pathParts[0];
+            const filePath = pathParts.slice(1).join('/');
+
+            let isDirectory = false;
+            let fileStats = null;
+            try {
+                fileStats = await vscode.workspace.fs.stat(uri);
+                isDirectory = (fileStats.type & vscode.FileType.Directory) !== 0;
+            } catch (error) {
+                isDirectory = false;
+            }
+
+            let realFileEntry = null;
+            if (command === 'chmodFile' || command === 'chownFile' || command === 'deleteFile' || command === 'renameFile') {
+                try {
+                    const filesService = new FilesService(apiClient);
+
+                    const token = authService.getAccessToken();
+                    if (token) {
+                        apiClient.setAuthToken(token);
+                    }
+
+                    const parentPath = filePath.split('/').slice(0, -1).join('/');
+                    const fileName = uri.path.split('/').pop() || '';
+
+                    const listing = await filesService.listDirectory(serverId, stackName, parentPath || undefined);
+
+                    if (listing && listing.entries) {
+                        realFileEntry = listing.entries.find(entry => entry.name === fileName);
+                    }
+                } catch (error) {
+                }
+            }
+
+            const mockTreeItem = {
+                data: {
+                    type: 'file' as const,
+                    server: { id: serverId, name: 'Unknown', host: '', port: 0, status: '' },
+                    stack: { name: stackName, status: '', serverId: serverId, services: [] },
+                    fileEntry: realFileEntry || {
+                        name: uri.path.split('/').pop() || '',
+                        path: filePath,
+                        isDirectory: isDirectory,
+                        size: fileStats?.size || 0,
+                        displaySize: fileStats?.size ? `${fileStats.size} B` : '0 B',
+                        modTime: fileStats?.mtime ? new Date(fileStats.mtime).toISOString() : '',
+                        mode: '0644'
+                    }
+                }
+            };
+
+            
+            switch (command) {
+                case 'createFile':
+                    await treeDataProvider.createFile(mockTreeItem as any);
+                    break;
+                case 'createFolder':
+                    await treeDataProvider.createFolder(mockTreeItem as any);
+                    break;
+                case 'deleteFile':
+                    await treeDataProvider.deleteFile(mockTreeItem as any);
+                    break;
+                case 'renameFile':
+                    await treeDataProvider.renameFile(mockTreeItem as any);
+                    break;
+                case 'uploadFile':
+                    
+                    await treeDataProvider.uploadFile(mockTreeItem as any);
+                    break;
+                case 'downloadFile':
+                    await treeDataProvider.downloadFile(mockTreeItem as any);
+                    break;
+                case 'chmodFile':
+                    await treeDataProvider.chmodFile(mockTreeItem as any);
+                    break;
+                case 'chownFile':
+                    await treeDataProvider.chownFile(mockTreeItem as any);
+                    break;
+                default:
+                    vscode.window.showErrorMessage(`Unknown command: ${command}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error executing ${command}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
     const commands = [
         vscode.commands.registerCommand('berth.login', () => authCommands.login()),
         vscode.commands.registerCommand('berth.logout', () => authCommands.logout()),
-        vscode.commands.registerCommand('berth.selectServer', () => authCommands.selectServer()),
-        vscode.commands.registerCommand('berth.selectStack', () => authCommands.selectStack()),
-        vscode.commands.registerCommand('berth.selectServerAndStack', () => authCommands.selectServerAndStack()),
         vscode.commands.registerCommand('berth.refreshStacks', () => treeDataProvider.refresh()),
 
-        vscode.commands.registerCommand('berth.createFile', (item) => {
-            if (item && item.fileEntry && item.fileEntry.isDirectory) {
-                treeDataProvider.createFile(item);
+        vscode.commands.registerCommand('berth.createFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('createFile', item);
+            } else if (item && item.fileEntry && item.fileEntry.isDirectory) {
+                await treeDataProvider.createFile(item);
             } else {
-                treeDataProvider.createFile();
+                await treeDataProvider.createFile();
             }
         }),
 
-        vscode.commands.registerCommand('berth.createFolder', (item) => {
-            if (item && item.fileEntry && item.fileEntry.isDirectory) {
-                treeDataProvider.createFolder(item);
+        vscode.commands.registerCommand('berth.createFolder', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('createFolder', item);
+            } else if (item && item.fileEntry && item.fileEntry.isDirectory) {
+                await treeDataProvider.createFolder(item);
             } else {
-                treeDataProvider.createFolder();
+                await treeDataProvider.createFolder();
             }
         }),
 
-        vscode.commands.registerCommand('berth.deleteFile', (item) => {
-            if (item) {
-                treeDataProvider.deleteFile(item);
+        vscode.commands.registerCommand('berth.deleteFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('deleteFile', item);
+            } else if (item) {
+                await treeDataProvider.deleteFile(item);
             }
         }),
 
-        vscode.commands.registerCommand('berth.renameFile', (item) => {
-            if (item) {
-                treeDataProvider.renameFile(item);
+        vscode.commands.registerCommand('berth.renameFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('renameFile', item);
+            } else if (item) {
+                await treeDataProvider.renameFile(item);
             }
         }),
 
-        vscode.commands.registerCommand('berth.uploadFile', (item) => {
-            if (item && item.fileEntry && item.fileEntry.isDirectory) {
-                treeDataProvider.uploadFile(item);
+        vscode.commands.registerCommand('berth.uploadFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('uploadFile', item);
+            } else if (item && item.fileEntry && item.fileEntry.isDirectory) {
+                await treeDataProvider.uploadFile(item);
             } else {
-                treeDataProvider.uploadFile();
+                await treeDataProvider.uploadFile();
             }
         }),
 
-        vscode.commands.registerCommand('berth.downloadFile', (item) => {
-            if (item) {
-                treeDataProvider.downloadFile(item);
+        vscode.commands.registerCommand('berth.downloadFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('downloadFile', item);
+            } else if (item) {
+                await treeDataProvider.downloadFile(item);
             }
         }),
 
@@ -86,19 +194,31 @@ export async function activate(context: vscode.ExtensionContext) {
             authCommands.openFile(fileEntry);
         }),
 
-        vscode.commands.registerCommand('berth.chmodFile', (item) => {
-            if (item) {
-                treeDataProvider.chmodFile(item);
+        vscode.commands.registerCommand('berth.chmodFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('chmodFile', item);
+            } else if (item) {
+                await treeDataProvider.chmodFile(item);
             }
         }),
 
-        vscode.commands.registerCommand('berth.chownFile', (item) => {
-            if (item) {
-                treeDataProvider.chownFile(item);
+        vscode.commands.registerCommand('berth.chownFile', async (item) => {
+            if (item instanceof vscode.Uri) {
+                await handleExplorerCommand('chownFile', item);
+            } else if (item) {
+                await treeDataProvider.chownFile(item);
             }
+        }),
+
+        vscode.commands.registerCommand('berth.openStackInExplorer', (server, stack) => {
+            authCommands.openStackInExplorer(server, stack);
         })
     ];
 
+    
+    const fileDecorationProvider = new BerthFileDecorationProvider(apiClient);
+    const fileDecorationProviderDisposable = vscode.window.registerFileDecorationProvider(fileDecorationProvider);
+    context.subscriptions.push(fileDecorationProviderDisposable);
 
     const configChangeHandler = vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('berth.serverUrl') ||
@@ -116,24 +236,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const updateStatusBar = () => {
         if (authService.isAuthenticated()) {
             const user = authService.getCurrentUser();
-            const server = treeDataProvider.getCurrentServer();
-            const stack = treeDataProvider.getCurrentStack();
 
             let statusText = `$(server) Berth: ${user?.username}`;
-            if (server) {
-                statusText += ` @ ${server.name}`;
-            }
-            if (stack) {
-                statusText += ` / ${stack.name}`;
-            }
-
             statusBarItem.text = statusText;
-            statusBarItem.tooltip = server && stack
-                ? `Connected to ${server.name} / ${stack.name} - Click to change server/stack`
-                : server
-                    ? `Connected to ${server.name} - Click to select server/stack`
-                    : 'Connected to Berth - Click to select server/stack';
-            statusBarItem.command = 'berth.selectServerAndStack';
+            statusBarItem.tooltip = 'Connected to Berth - Browse servers and stacks in the Berth panel';
+            statusBarItem.command = 'workbench.view.extension.berth';
         } else {
             statusBarItem.text = '$(server) Berth: Not connected';
             statusBarItem.tooltip = 'Click to login to Berth';

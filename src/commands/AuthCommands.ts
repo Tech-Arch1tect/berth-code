@@ -1,14 +1,21 @@
 import * as vscode from 'vscode';
 import { AuthService } from '../services/AuthService';
 import { ApiClient } from '../services/ApiClient';
-import { StackTreeDataProvider } from '../providers/StackTreeDataProvider';
 import { Server, Stack } from '../types';
+
+interface TreeDataProvider {
+    refresh(): void;
+    getCurrentServer(): Server | null;
+    getCurrentStack(): Stack | null;
+    setCurrentServer(server: Server | null): void;
+    setCurrentStack(stack: Stack | null): void;
+}
 
 export class AuthCommands {
     constructor(
         private authService: AuthService,
         private apiClient: ApiClient,
-        private treeDataProvider: StackTreeDataProvider
+        private treeDataProvider: TreeDataProvider
     ) {}
 
     public async login(): Promise<void> {
@@ -373,6 +380,64 @@ export class AuthCommands {
             await vscode.window.showTextDocument(document);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    public async openStackInExplorer(server?: Server, stack?: Stack): Promise<void> {
+        if (!this.authService.isAuthenticated()) {
+            vscode.window.showErrorMessage('Please login first');
+            return;
+        }
+
+        
+        const targetServer = server || this.treeDataProvider.getCurrentServer();
+        const targetStack = stack || this.treeDataProvider.getCurrentStack();
+
+        if (!targetServer || !targetStack) {
+            vscode.window.showErrorMessage('Please select a server and stack first');
+            return;
+        }
+
+        try {
+            
+            const stackUri = vscode.Uri.parse(`berth://${targetServer.id}/${targetStack.name}`);
+
+            const workspaceFolder: vscode.WorkspaceFolder = {
+                uri: stackUri,
+                name: `${targetServer.name} - ${targetStack.name}`,
+                index: vscode.workspace.workspaceFolders?.length || 0
+            };
+
+            
+            const existingFolder = vscode.workspace.workspaceFolders?.find(f => f.uri.toString() === stackUri.toString());
+
+            if (existingFolder) {
+                vscode.window.showInformationMessage(`Stack "${targetStack.name}" is already open in Explorer`);
+                await vscode.commands.executeCommand('workbench.view.explorer');
+                return;
+            }
+
+            
+            const insertIndex = vscode.workspace.workspaceFolders?.length || 0;
+
+            const success = vscode.workspace.updateWorkspaceFolders(
+                insertIndex,
+                0,
+                workspaceFolder
+            );
+
+            if (success) {
+                vscode.window.showInformationMessage(
+                    `Stack "${targetStack.name}" opened in Explorer`
+                );
+
+                
+                await vscode.commands.executeCommand('workbench.view.explorer');
+            } else {
+                vscode.window.showErrorMessage('Failed to open stack in Explorer');
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to open stack in Explorer: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 }

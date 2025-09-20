@@ -85,7 +85,12 @@ export class FilesService {
     }
 
     public async renameFile(serverId: number, stackName: string, request: RenameRequest): Promise<void> {
-        const response = await this.apiClient.post(`/api/v1/servers/${serverId}/stacks/${stackName}/files/rename`, request);
+        const apiRequest = {
+            old_path: request.oldPath,
+            new_path: request.newPath
+        };
+
+        const response = await this.apiClient.post(`/api/v1/servers/${serverId}/stacks/${stackName}/files/rename`, apiRequest);
 
         if (!response.ok) {
             await this.handleError(response, 'Failed to rename');
@@ -181,7 +186,7 @@ export class FilesService {
     }
 
     private formatFileSize(bytes: number): string {
-        if (bytes === 0) return '0 B';
+        if (bytes === 0) { return '0 B'; }
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
