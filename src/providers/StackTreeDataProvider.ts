@@ -188,6 +188,11 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             let parentPath = '';
             if (parentItem && parentItem.fileEntry) {
                 parentPath = parentItem.fileEntry.path;
@@ -223,6 +228,11 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             let parentPath = '';
             if (parentItem && parentItem.fileEntry) {
                 parentPath = parentItem.fileEntry.path;
@@ -257,6 +267,11 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             await this.filesService.deleteFile(this.currentServer.id, this.currentStack.name, {
                 path: item.fileEntry.path
             });
@@ -283,6 +298,11 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             const pathSegments = item.fileEntry.path.split('/');
             pathSegments[pathSegments.length - 1] = newName;
             const newPath = pathSegments.join('/');
@@ -317,6 +337,11 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             let parentPath = '';
             if (parentItem && parentItem.fileEntry) {
                 parentPath = parentItem.fileEntry.path;
@@ -350,6 +375,11 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             const saveUri = await vscode.window.showSaveDialog({
                 defaultUri: vscode.Uri.file(item.fileEntry.name),
                 saveLabel: 'Download'

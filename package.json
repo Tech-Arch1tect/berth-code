@@ -125,6 +125,21 @@
           "command": "berth.selectStack",
           "when": "view == berthStackExplorer",
           "group": "1_server"
+        },
+        {
+          "command": "berth.createFile",
+          "when": "view == berthStackExplorer",
+          "group": "2_creation"
+        },
+        {
+          "command": "berth.createFolder",
+          "when": "view == berthStackExplorer",
+          "group": "2_creation"
+        },
+        {
+          "command": "berth.uploadFile",
+          "when": "view == berthStackExplorer",
+          "group": "3_upload"
         }
       ],
       "view/item/context": [
@@ -183,6 +198,21 @@
           "command": "berth.refreshStacks",
           "when": "view == berthStackExplorer",
           "group": "navigation@2"
+        },
+        {
+          "command": "berth.createFile",
+          "when": "view == berthStackExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "berth.createFolder",
+          "when": "view == berthStackExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "berth.uploadFile",
+          "when": "view == berthStackExplorer",
+          "group": "navigation@5"
         }
       ]
     },
