@@ -69,7 +69,6 @@ export class AuthService {
 
             return true;
         } catch (error) {
-            console.error('Failed to initialize from storage:', error);
             return false;
         }
     }
@@ -255,6 +254,7 @@ export class AuthService {
             }
 
             const apiClient = new ApiClient();
+            apiClient.setAuthToken(this.accessToken);
 
             const response = await apiClient.get('/api/v1/profile');
 
@@ -265,8 +265,11 @@ export class AuthService {
                 return true;
             } else if (response.status === 401) {
                 const refreshResult = await this.refreshAccessToken();
+
                 if (refreshResult) {
+                    apiClient.setAuthToken(this.accessToken!);
                     const retryResponse = await apiClient.get('/api/v1/profile');
+
                     if (retryResponse.ok) {
                         const data = await retryResponse.json() as any;
                         this.currentUser = data;

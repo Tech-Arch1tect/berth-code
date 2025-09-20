@@ -25,15 +25,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
-    const isAuthenticated = await authService.initializeFromStorage();
-    if (isAuthenticated) {
-        syncTokenToApiClient();
-        const isValid = await authService.checkAuthStatus();
-        if (!isValid) {
-
-        }
-    }
-
     const treeView = vscode.window.createTreeView('berthStackExplorer', {
         treeDataProvider: treeDataProvider,
         showCollapseAll: true
@@ -138,6 +129,22 @@ export async function activate(context: vscode.ExtensionContext) {
     treeDataProvider.onDidChangeTreeData(() => {
         updateStatusBar();
     });
+
+    const initializeAuth = async () => {
+        const isAuthenticated = await authService.initializeFromStorage();
+
+        if (isAuthenticated) {
+            syncTokenToApiClient();
+            const isValid = await authService.checkAuthStatus();
+
+            if (isValid) {
+                treeDataProvider.refresh();
+                updateStatusBar();
+            }
+        }
+    };
+
+    initializeAuth();
 
     context.subscriptions.push(
         treeView,
