@@ -128,7 +128,11 @@ export class AuthCommands {
         }
 
         try {
-            
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             const response = await this.apiClient.get('/api/v1/servers');
             if (!response.ok) {
                 throw new Error(`Failed to fetch servers: ${response.status}`);
@@ -161,7 +165,9 @@ export class AuthCommands {
 
             if (selected) {
                 this.treeDataProvider.setCurrentServer(selected.server);
+                this.treeDataProvider.setCurrentStack(null);
                 vscode.window.showInformationMessage(`Selected server: ${selected.server.name}`);
+                this.treeDataProvider.refresh();
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to load servers: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -181,6 +187,11 @@ export class AuthCommands {
         }
 
         try {
+            const token = this.authService.getAccessToken();
+            if (token) {
+                this.apiClient.setAuthToken(token);
+            }
+
             const response = await this.apiClient.get(`/api/v1/servers/${currentServer.id}/stacks`);
 
             if (!response.ok) {
@@ -215,10 +226,132 @@ export class AuthCommands {
             if (selected) {
                 this.treeDataProvider.setCurrentStack(selected.stack);
                 vscode.window.showInformationMessage(`Selected stack: ${selected.stack.name}`);
+                this.treeDataProvider.refresh();
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to load stacks: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+    }
+
+    public async selectServerAndStack(): Promise<void> {
+        if (!this.authService.isAuthenticated()) {
+            vscode.window.showErrorMessage('Please login first');
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Loading servers and stacks...',
+            cancellable: false
+        }, async (progress) => {
+            try {
+                const token = this.authService.getAccessToken();
+                if (token) {
+                    this.apiClient.setAuthToken(token);
+                }
+
+                progress.report({ increment: 20, message: 'Fetching servers...' });
+
+                const serversResponse = await this.apiClient.get('/api/v1/servers');
+                if (!serversResponse.ok) {
+                    throw new Error(`Failed to fetch servers: ${serversResponse.status}`);
+                }
+
+                const serversData = await serversResponse.json() as any;
+                let servers: Server[];
+                if (Array.isArray(serversData)) {
+                    servers = serversData;
+                } else {
+                    servers = serversData.servers || [];
+                }
+
+                if (servers.length === 0) {
+                    vscode.window.showInformationMessage('No servers available');
+                    return;
+                }
+
+                progress.report({ increment: 30, message: 'Select server...' });
+
+                const currentServer = this.treeDataProvider.getCurrentServer();
+                const serverItems = servers.map(server => ({
+                    label: server.name,
+                    description: `${server.host}:${server.port}`,
+                    detail: server.description || '',
+                    picked: currentServer?.id === server.id,
+                    server: server
+                }));
+
+                const selectedServerItem = await vscode.window.showQuickPick(serverItems, {
+                    placeHolder: 'Select a server',
+                    matchOnDescription: true,
+                    matchOnDetail: true
+                });
+
+                if (!selectedServerItem) {
+                    return;
+                }
+
+                progress.report({ increment: 20, message: 'Fetching stacks...' });
+
+                const stacksResponse = await this.apiClient.get(`/api/v1/servers/${selectedServerItem.server.id}/stacks`);
+                if (!stacksResponse.ok) {
+                    throw new Error(`Failed to fetch stacks: ${stacksResponse.status}`);
+                }
+
+                const stacksData = await stacksResponse.json() as any;
+                let stacks: Stack[];
+                if (Array.isArray(stacksData)) {
+                    stacks = stacksData;
+                } else {
+                    stacks = stacksData.stacks || [];
+                }
+
+                if (!stacks || stacks.length === 0) {
+                    this.treeDataProvider.setCurrentServer(selectedServerItem.server);
+                    this.treeDataProvider.setCurrentStack(null);
+                    vscode.window.showInformationMessage(`Selected server: ${selectedServerItem.server.name} (no stacks available)`);
+                    this.treeDataProvider.refresh();
+                    return;
+                }
+
+                progress.report({ increment: 20, message: 'Select stack...' });
+
+                const currentStack = this.treeDataProvider.getCurrentStack();
+                const stackItems = stacks.map(stack => ({
+                    label: stack.name,
+                    description: stack.status || 'Unknown',
+                    detail: `${stack.services ? stack.services.length : 0} service(s)`,
+                    picked: currentStack?.name === stack.name,
+                    stack: stack
+                }));
+
+                const selectedStackItem = await vscode.window.showQuickPick(stackItems, {
+                    placeHolder: `Select a stack on ${selectedServerItem.server.name}`,
+                    matchOnDescription: true
+                });
+
+                if (selectedStackItem) {
+                    progress.report({ increment: 10, message: 'Updating selection...' });
+
+                    this.treeDataProvider.setCurrentServer(selectedServerItem.server);
+                    this.treeDataProvider.setCurrentStack(selectedStackItem.stack);
+
+                    vscode.window.showInformationMessage(
+                        `Selected: ${selectedServerItem.server.name} / ${selectedStackItem.stack.name}`
+                    );
+
+                    this.treeDataProvider.refresh();
+                } else if (selectedServerItem.server.id !== currentServer?.id) {
+                    this.treeDataProvider.setCurrentServer(selectedServerItem.server);
+                    this.treeDataProvider.setCurrentStack(null);
+                    vscode.window.showInformationMessage(`Selected server: ${selectedServerItem.server.name}`);
+                    this.treeDataProvider.refresh();
+                }
+
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to load servers and stacks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+        });
     }
 
     public async openFile(fileEntry: any): Promise<void> {

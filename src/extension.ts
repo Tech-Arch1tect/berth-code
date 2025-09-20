@@ -37,6 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('berth.logout', () => authCommands.logout()),
         vscode.commands.registerCommand('berth.selectServer', () => authCommands.selectServer()),
         vscode.commands.registerCommand('berth.selectStack', () => authCommands.selectStack()),
+        vscode.commands.registerCommand('berth.selectServerAndStack', () => authCommands.selectServerAndStack()),
         vscode.commands.registerCommand('berth.refreshStacks', () => treeDataProvider.refresh()),
 
         vscode.commands.registerCommand('berth.createFile', (item) => {
@@ -99,7 +100,6 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBarItem.command = 'berth.login';
 
     const updateStatusBar = () => {
         if (authService.isAuthenticated()) {
@@ -116,10 +116,16 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
             statusBarItem.text = statusText;
-            statusBarItem.tooltip = 'Connected to Berth';
+            statusBarItem.tooltip = server && stack
+                ? `Connected to ${server.name} / ${stack.name} - Click to change server/stack`
+                : server
+                    ? `Connected to ${server.name} - Click to select server/stack`
+                    : 'Connected to Berth - Click to select server/stack';
+            statusBarItem.command = 'berth.selectServerAndStack';
         } else {
             statusBarItem.text = '$(server) Berth: Not connected';
             statusBarItem.tooltip = 'Click to login to Berth';
+            statusBarItem.command = 'berth.login';
         }
         statusBarItem.show();
     };

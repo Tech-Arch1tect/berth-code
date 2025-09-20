@@ -35,12 +35,20 @@
       {
         "command": "berth.selectServer",
         "title": "Select Server",
-        "category": "Berth"
+        "category": "Berth",
+        "icon": "$(server)"
       },
       {
         "command": "berth.selectStack",
         "title": "Select Stack",
-        "category": "Berth"
+        "category": "Berth",
+        "icon": "$(layers)"
+      },
+      {
+        "command": "berth.selectServerAndStack",
+        "title": "Select Server & Stack",
+        "category": "Berth",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "berth.createFile",
@@ -160,6 +168,21 @@
         },
         {
           "command": "berth.selectStack"
+        },
+        {
+          "command": "berth.selectServerAndStack"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "berth.selectServerAndStack",
+          "when": "view == berthStackExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "berth.refreshStacks",
+          "when": "view == berthStackExplorer",
+          "group": "navigation@2"
         }
       ]
     },

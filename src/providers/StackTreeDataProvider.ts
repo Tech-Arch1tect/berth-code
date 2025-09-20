@@ -86,7 +86,7 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
         this.refresh();
     }
 
-    public setCurrentStack(stack: Stack): void {
+    public setCurrentStack(stack: Stack | null): void {
         this.currentStack = stack;
         this.refresh();
     }
