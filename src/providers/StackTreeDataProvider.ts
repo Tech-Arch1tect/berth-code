@@ -14,7 +14,15 @@ export class StackTreeItem extends vscode.TreeItem {
         super(label, collapsibleState);
 
         if (fileEntry) {
-            let tooltip = `${fileEntry.name}\nSize: ${fileEntry.displaySize}\nModified: ${fileEntry.modTime}\nPermissions: ${fileEntry.mode}`;
+            const permissions = fileEntry.mode;
+            let permissionDisplay = permissions;
+
+            if (permissions && permissions.match(/^[d-][rwx-]{9}$/)) {
+                const numericMode = StackTreeItem.convertSymbolicToNumeric(permissions);
+                permissionDisplay = `${permissions} (${numericMode})`;
+            }
+
+            let tooltip = `${fileEntry.name}\nSize: ${fileEntry.displaySize}\nModified: ${fileEntry.modTime}\nPermissions: ${permissionDisplay}`;
 
             if (fileEntry.ownerId !== undefined || fileEntry.groupId !== undefined || fileEntry.owner || fileEntry.group) {
                 let ownerInfo = '';
@@ -91,6 +99,36 @@ export class StackTreeItem extends vscode.TreeItem {
             default:
                 return new vscode.ThemeIcon('file');
         }
+    }
+
+    static convertSymbolicToNumeric(symbolic: string): string {
+        if (!symbolic || symbolic.length !== 10) {
+            return 'unknown';
+        }
+
+        const permissions = symbolic.slice(1);
+
+        let numeric = '';
+        
+        for (let i = 0; i < 9; i += 3) {
+            let value = 0;
+
+            if (permissions[i] === 'r') {
+                value += 4;
+            }
+            
+            if (permissions[i + 1] === 'w') {
+                value += 2;
+            }
+            
+            if (permissions[i + 2] === 'x' || permissions[i + 2] === 's' || permissions[i + 2] === 't') {
+                value += 1;
+            }
+
+            numeric += value.toString();
+        }
+
+        return '0' + numeric;
     }
 }
 
@@ -585,4 +623,5 @@ export class StackTreeDataProvider implements vscode.TreeDataProvider<StackTreeI
             vscode.window.showErrorMessage(`Failed to change ownership: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
+
 }
