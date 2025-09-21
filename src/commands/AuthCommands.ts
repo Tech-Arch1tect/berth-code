@@ -12,11 +12,17 @@ interface TreeDataProvider {
 }
 
 export class AuthCommands {
+    private authStateChangeCallback: (() => void) | null = null;
+
     constructor(
         private authService: AuthService,
         private apiClient: ApiClient,
         private treeDataProvider: TreeDataProvider
     ) {}
+
+    public setAuthStateChangeCallback(callback: () => void): void {
+        this.authStateChangeCallback = callback;
+    }
 
     public async login(): Promise<void> {
         try {
@@ -62,6 +68,7 @@ export class AuthCommands {
 
                         vscode.window.showInformationMessage('Successfully logged in to Berth');
                         this.treeDataProvider.refresh();
+                        this.authStateChangeCallback?.();
                     }
                 } else {
                     vscode.window.showErrorMessage(`Login failed: ${result.message}`);
@@ -103,6 +110,7 @@ export class AuthCommands {
 
                 vscode.window.showInformationMessage('Successfully logged in to Berth');
                 this.treeDataProvider.refresh();
+                this.authStateChangeCallback?.();
             } else {
                 vscode.window.showErrorMessage(`TOTP verification failed: ${result.message}`);
             }
@@ -123,6 +131,7 @@ export class AuthCommands {
 
             vscode.window.showInformationMessage('Successfully logged out from Berth');
             this.treeDataProvider.refresh();
+            this.authStateChangeCallback?.();
         } catch (error) {
             vscode.window.showErrorMessage(`Logout error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }

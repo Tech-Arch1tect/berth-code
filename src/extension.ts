@@ -15,20 +15,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const fileSystemProvider = new BerthFileSystemProvider(apiClient);
     const authCommands = new AuthCommands(authService, apiClient, treeDataProvider);
 
-    const refreshCallback = async () => {
-        const success = await authService.refreshAccessToken();
-        if (success) {
-            const newToken = authService.getAccessToken();
-            if (newToken) {
-                apiClient.setAuthToken(newToken);
-            }
-        }
-        return success;
-    };
-
-    authService.setTokenRefreshCallback(refreshCallback);
-    apiClient.setTokenRefreshCallback(refreshCallback);
-
     const syncTokenToApiClient = () => {
         const token = authService.getAccessToken();
         if (token) {
@@ -36,7 +22,21 @@ export async function activate(context: vscode.ExtensionContext) {
         } else {
             apiClient.clearAuthToken();
         }
+        fileSystemProvider.refresh();
     };
+
+    const refreshCallback = async () => {
+        const success = await authService.refreshAccessToken();
+        if (success) {
+            syncTokenToApiClient();
+        }
+        return success;
+    };
+
+    authService.setTokenRefreshCallback(refreshCallback);
+    apiClient.setTokenRefreshCallback(refreshCallback);
+
+    authCommands.setAuthStateChangeCallback(syncTokenToApiClient);
 
     const treeView = vscode.window.createTreeView('berthServers', {
         treeDataProvider: treeDataProvider,

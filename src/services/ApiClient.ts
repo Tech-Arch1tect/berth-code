@@ -34,6 +34,10 @@ export class ApiClient {
         this.authToken = token;
     }
 
+    public getAuthToken(): string | null {
+        return this.authToken;
+    }
+
     public clearAuthToken(): void {
         this.authToken = null;
     }

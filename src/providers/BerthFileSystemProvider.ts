@@ -10,6 +10,14 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
         this.filesService = new FilesService(apiClient);
     }
 
+    private isAuthenticated(): boolean {
+        return this.apiClient.getAuthToken() !== null;
+    }
+
+    public refresh(): void {
+        this._onDidChangeFile.fire([]);
+    }
+
     get onDidChangeFile(): vscode.Event<vscode.FileChangeEvent[]> {
         return this._onDidChangeFile.event;
     }
@@ -19,30 +27,51 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
     }
 
     stat(uri: vscode.Uri): vscode.FileStat | Thenable<vscode.FileStat> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.getFileStat(uri);
     }
 
     readDirectory(uri: vscode.Uri): [string, vscode.FileType][] | Thenable<[string, vscode.FileType][]> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.readDirectoryContents(uri);
     }
 
     createDirectory(uri: vscode.Uri): void | Thenable<void> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.createDirectoryAtPath(uri);
     }
 
     delete(uri: vscode.Uri): void | Thenable<void> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.deleteAtPath(uri);
     }
 
     rename(oldUri: vscode.Uri, newUri: vscode.Uri): void | Thenable<void> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.renameAtPath(oldUri, newUri);
     }
 
     readFile(uri: vscode.Uri): Uint8Array | Thenable<Uint8Array> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.readFileContent(uri);
     }
 
     writeFile(uri: vscode.Uri, content: Uint8Array): void | Thenable<void> {
+        if (!this.isAuthenticated()) {
+            throw vscode.FileSystemError.Unavailable('Not authenticated to Berth server');
+        }
         return this.writeFileContent(uri, content);
     }
 
