@@ -29,6 +29,8 @@ export class AuthService {
     private accessToken: string | null = null;
     private refreshToken: string | null = null;
     private tokenRefreshCallback: (() => Promise<boolean>) | null = null;
+    private tokenExpiryTime: number | null = null;
+    private refreshTimer: NodeJS.Timeout | null = null;
 
     constructor(
         private secretStorage: vscode.SecretStorage,
@@ -37,6 +39,46 @@ export class AuthService {
 
     public setTokenRefreshCallback(callback: () => Promise<boolean>): void {
         this.tokenRefreshCallback = callback;
+    }
+
+    private decodeJwtExpiry(token: string): number | null {
+        try {
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                return null;
+            }
+
+            const payload = parts[1];
+            const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
+            const decodedPayload = JSON.parse(atob(paddedPayload));
+
+            return decodedPayload.exp ? decodedPayload.exp * 1000 : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    private scheduleTokenRefresh(): void {
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer);
+        }
+
+        if (!this.tokenExpiryTime) {
+            return;
+        }
+
+        const now = Date.now();
+        const timeUntilExpiry = this.tokenExpiryTime - now;
+
+        const refreshTime = Math.min(timeUntilExpiry - (2 * 60 * 1000), 10 * 60 * 1000);
+
+        if (refreshTime > 0) {
+            this.refreshTimer = setTimeout(async () => {
+                if (this.tokenRefreshCallback) {
+                    await this.tokenRefreshCallback();
+                }
+            }, refreshTime);
+        }
     }
 
     public getAccessToken(): string | null {
@@ -64,6 +106,11 @@ export class AuthService {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
             this.currentUser = JSON.parse(userJson);
+
+            if (this.accessToken) {
+                this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
+                this.scheduleTokenRefresh();
+            }
 
             await vscode.commands.executeCommand('setContext', 'berth.authenticated', true);
 
@@ -96,6 +143,11 @@ export class AuthService {
 
                 this.accessToken = data.access_token;
                 this.refreshToken = data.refresh_token;
+
+                if (this.accessToken) {
+                    this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
+                    this.scheduleTokenRefresh();
+                }
 
                 if (data.user) {
                     this.currentUser = data.user;
@@ -153,6 +205,11 @@ export class AuthService {
                 this.accessToken = data.access_token;
                 this.refreshToken = data.refresh_token;
 
+                if (this.accessToken) {
+                    this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
+                    this.scheduleTokenRefresh();
+                }
+
                 if (data.user) {
                     this.currentUser = data.user;
 
@@ -208,6 +265,12 @@ export class AuthService {
             this.currentUser = null;
             this.accessToken = null;
             this.refreshToken = null;
+            this.tokenExpiryTime = null;
+
+            if (this.refreshTimer) {
+                clearTimeout(this.refreshTimer);
+                this.refreshTimer = null;
+            }
 
             await this.clearTokensFromStorage();
             await this.removeUserFromStorage();
@@ -233,6 +296,11 @@ export class AuthService {
                 const data = await response.json() as any;
                 this.accessToken = data.access_token;
                 this.refreshToken = data.refresh_token;
+
+                if (this.accessToken) {
+                    this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
+                    this.scheduleTokenRefresh();
+                }
 
                 if (this.accessToken && this.refreshToken) {
                     await this.saveTokensToStorage(this.accessToken, this.refreshToken);

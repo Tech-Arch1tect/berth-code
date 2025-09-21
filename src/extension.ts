@@ -15,8 +15,19 @@ export async function activate(context: vscode.ExtensionContext) {
     const fileSystemProvider = new BerthFileSystemProvider(apiClient);
     const authCommands = new AuthCommands(authService, apiClient, treeDataProvider);
 
-    authService.setTokenRefreshCallback(() => authService.refreshAccessToken());
-    apiClient.setTokenRefreshCallback(() => authService.refreshAccessToken());
+    const refreshCallback = async () => {
+        const success = await authService.refreshAccessToken();
+        if (success) {
+            const newToken = authService.getAccessToken();
+            if (newToken) {
+                apiClient.setAuthToken(newToken);
+            }
+        }
+        return success;
+    };
+
+    authService.setTokenRefreshCallback(refreshCallback);
+    apiClient.setTokenRefreshCallback(refreshCallback);
 
     const syncTokenToApiClient = () => {
         const token = authService.getAccessToken();
