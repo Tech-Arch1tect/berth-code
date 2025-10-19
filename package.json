@@ -18,7 +18,7 @@
     "commands": [
       {
         "command": "berth.login",
-        "title": "Login to Berth",
+        "title": "Login with API Key",
         "category": "Berth"
       },
       {
@@ -106,7 +106,7 @@
     "viewsWelcome": [
       {
         "view": "berthServers",
-        "contents": "Connect to a Berth server to manage your Docker stacks.\n\n[Login to Berth](command:berth.login)\n\nTo learn more about Berth, [read the documentation](https://github.com/tech-arch1tect/berth)."
+        "contents": "Connect to a Berth server to manage your Docker stacks.\n\n[Login with API Key](command:berth.login)\n\nYou will need a Berth API key (starting with 'brth_'). Create one in your Berth server settings.\n\nTo learn more about Berth, [read the documentation](https://github.com/tech-arch1tect/berth)."
       }
     ],
     "menus": {

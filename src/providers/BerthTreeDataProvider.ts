@@ -215,9 +215,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const filePath = parentPath ? `${parentPath}/${fileName}` : fileName;
@@ -269,9 +269,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const folderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
@@ -308,9 +308,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             await this.filesService.deleteFile(server.id, stack.name, {
@@ -344,9 +344,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const pathSegments = fileEntry.path.split('/');
@@ -408,9 +408,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             for (const fileUri of files) {
@@ -446,9 +446,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         const stack = item.data.stack;
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const saveUri = await vscode.window.showSaveDialog({
@@ -526,9 +526,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             await this.filesService.chmodFile(server.id, stack.name, {
@@ -604,9 +604,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const ownerId = ownerInput.trim() ? parseInt(ownerInput.trim()) : undefined;
@@ -672,9 +672,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
 
     private async getServers(): Promise<BerthTreeItemImpl[]> {
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const response = await this.apiClient.get('/api/v1/servers');
@@ -706,9 +706,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
 
     private async getStacks(server: Server): Promise<BerthTreeItemImpl[]> {
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const response = await this.apiClient.get(`/api/v1/servers/${server.id}/stacks`);
@@ -748,9 +748,9 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
 
     private async getFiles(server: Server, stack: Stack, path?: string): Promise<BerthTreeItemImpl[]> {
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const listing = await this.filesService.listDirectory(server.id, stack.name, path);

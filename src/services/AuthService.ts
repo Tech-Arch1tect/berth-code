@@ -16,73 +16,22 @@ export interface AuthResponse {
     success: boolean;
     message: string;
     user?: User;
-    totpRequired?: boolean;
-    temporaryToken?: string;
 }
 
 export class AuthService {
-    private static readonly ACCESS_TOKEN_KEY = 'berth.accessToken';
-    private static readonly REFRESH_TOKEN_KEY = 'berth.refreshToken';
+    private static readonly API_KEY_STORAGE_KEY = 'berth.apiKey';
     private static readonly USER_KEY = 'berth.user';
 
     private currentUser: User | null = null;
-    private accessToken: string | null = null;
-    private refreshToken: string | null = null;
-    private tokenRefreshCallback: (() => Promise<boolean>) | null = null;
-    private tokenExpiryTime: number | null = null;
-    private refreshTimer: NodeJS.Timeout | null = null;
+    private apiKey: string | null = null;
 
     constructor(
         private secretStorage: vscode.SecretStorage,
         private context: vscode.ExtensionContext
     ) {}
 
-    public setTokenRefreshCallback(callback: () => Promise<boolean>): void {
-        this.tokenRefreshCallback = callback;
-    }
-
-    private decodeJwtExpiry(token: string): number | null {
-        try {
-            const parts = token.split('.');
-            if (parts.length !== 3) {
-                return null;
-            }
-
-            const payload = parts[1];
-            const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
-            const decodedPayload = JSON.parse(atob(paddedPayload));
-
-            return decodedPayload.exp ? decodedPayload.exp * 1000 : null;
-        } catch (error) {
-            return null;
-        }
-    }
-
-    private scheduleTokenRefresh(): void {
-        if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer);
-        }
-
-        if (!this.tokenExpiryTime) {
-            return;
-        }
-
-        const now = Date.now();
-        const timeUntilExpiry = this.tokenExpiryTime - now;
-
-        const refreshTime = Math.min(timeUntilExpiry - (2 * 60 * 1000), 10 * 60 * 1000);
-
-        if (refreshTime > 0) {
-            this.refreshTimer = setTimeout(async () => {
-                if (this.tokenRefreshCallback) {
-                    await this.tokenRefreshCallback();
-                }
-            }, refreshTime);
-        }
-    }
-
-    public getAccessToken(): string | null {
-        return this.accessToken;
+    public getApiKey(): string | null {
+        return this.apiKey;
     }
 
     public getCurrentUser(): User | null {
@@ -90,27 +39,20 @@ export class AuthService {
     }
 
     public isAuthenticated(): boolean {
-        return this.currentUser !== null && this.accessToken !== null;
+        return this.currentUser !== null && this.apiKey !== null;
     }
 
     public async initializeFromStorage(): Promise<boolean> {
         try {
-            const accessToken = await this.secretStorage.get(AuthService.ACCESS_TOKEN_KEY);
-            const refreshToken = await this.secretStorage.get(AuthService.REFRESH_TOKEN_KEY);
+            const apiKey = await this.secretStorage.get(AuthService.API_KEY_STORAGE_KEY);
             const userJson = await this.secretStorage.get(AuthService.USER_KEY);
 
-            if (!accessToken || !refreshToken || !userJson) {
+            if (!apiKey || !userJson) {
                 return false;
             }
 
-            this.accessToken = accessToken;
-            this.refreshToken = refreshToken;
+            this.apiKey = apiKey;
             this.currentUser = JSON.parse(userJson);
-
-            if (this.accessToken) {
-                this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
-                this.scheduleTokenRefresh();
-            }
 
             await vscode.commands.executeCommand('setContext', 'berth.authenticated', true);
 
@@ -120,68 +62,56 @@ export class AuthService {
         }
     }
 
-    public async login(username: string, password: string): Promise<AuthResponse> {
+    public async setApiKey(apiKey: string): Promise<AuthResponse> {
         try {
-            const apiClient = new ApiClient();
+            
+            if (!apiKey.startsWith('brth_')) {
+                return {
+                    success: false,
+                    message: 'Invalid API key format. API keys should start with "brth_".'
+                };
+            }
 
-            const response = await apiClient.post('/api/v1/auth/login', {
-                username,
-                password
-            });
+            
+            this.apiKey = apiKey;
+            const apiClient = new ApiClient();
+            apiClient.setAuthToken(this.apiKey);
+
+            const response = await apiClient.get('/api/v1/profile');
 
             if (response.ok) {
                 const data = await response.json() as any;
+                this.currentUser = data;
 
-                if (data.totp_required === true) {
-                    return {
-                        success: true,
-                        message: data.message || 'Two-factor authentication required',
-                        totpRequired: true,
-                        temporaryToken: data.temporary_token
-                    };
+                
+                await this.saveApiKeyToStorage(this.apiKey);
+                if (this.currentUser) {
+                    await this.saveUserToStorage(this.currentUser);
                 }
 
-                this.accessToken = data.access_token;
-                this.refreshToken = data.refresh_token;
+                await vscode.commands.executeCommand('setContext', 'berth.authenticated', true);
 
-                if (this.accessToken) {
-                    this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
-                    this.scheduleTokenRefresh();
-                }
-
-                if (data.user) {
-                    this.currentUser = data.user;
-
-                    if (this.accessToken && this.refreshToken) {
-                        if (this.accessToken && this.refreshToken) {
-                    await this.saveTokensToStorage(this.accessToken, this.refreshToken);
-                }
-                    }
-                    if (this.currentUser) {
-                        await this.saveUserToStorage(this.currentUser);
-                    }
-
-                    await vscode.commands.executeCommand('setContext', 'berth.authenticated', true);
-
-                    return {
-                        success: true,
-                        message: 'Login successful',
-                        user: this.currentUser || undefined
-                    };
-                } else {
-                    return {
-                        success: false,
-                        message: 'Login failed - invalid response format'
-                    };
-                }
+                return {
+                    success: true,
+                    message: 'Authentication successful',
+                    user: this.currentUser || undefined
+                };
             } else {
+                
+                this.apiKey = null;
+                this.currentUser = null;
+
                 const errorData = await response.json() as any;
                 return {
                     success: false,
-                    message: errorData.message || 'Login failed. Please try again.'
+                    message: errorData.message || 'Invalid API key. Please check your API key and try again.'
                 };
             }
         } catch (error) {
+            
+            this.apiKey = null;
+            this.currentUser = null;
+
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             return {
                 success: false,
@@ -190,164 +120,45 @@ export class AuthService {
         }
     }
 
-    public async verifyTOTP(temporaryToken: string, code: string): Promise<AuthResponse> {
-        try {
-            const apiClient = new ApiClient();
-
-            const response = await apiClient.post('/api/v1/auth/totp/verify',
-                { code },
-                { 'Authorization': `Bearer ${temporaryToken}` }
-            );
-
-            if (response.ok) {
-                const data = await response.json() as any;
-
-                this.accessToken = data.access_token;
-                this.refreshToken = data.refresh_token;
-
-                if (this.accessToken) {
-                    this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
-                    this.scheduleTokenRefresh();
-                }
-
-                if (data.user) {
-                    this.currentUser = data.user;
-
-                    if (this.accessToken && this.refreshToken) {
-                        if (this.accessToken && this.refreshToken) {
-                    await this.saveTokensToStorage(this.accessToken, this.refreshToken);
-                }
-                    }
-                    if (this.currentUser) {
-                        await this.saveUserToStorage(this.currentUser);
-                    }
-
-                    
-                    await vscode.commands.executeCommand('setContext', 'berth.authenticated', true);
-
-                    return {
-                        success: true,
-                        message: 'Two-factor authentication successful',
-                        user: this.currentUser || undefined
-                    };
-                } else {
-                    return {
-                        success: false,
-                        message: 'TOTP verification failed - invalid response format'
-                    };
-                }
-            } else {
-                const errorData = await response.json() as any;
-                return {
-                    success: false,
-                    message: errorData.message || 'Invalid TOTP code'
-                };
-            }
-        } catch (error) {
-            return {
-                success: false,
-                message: 'Network error. Please check your connection.'
-            };
-        }
-    }
 
     public async logout(): Promise<void> {
         try {
-            if (this.accessToken && this.refreshToken) {
-                const apiClient = new ApiClient();
-                await apiClient.post('/api/v1/auth/logout', {
-                    refresh_token: this.refreshToken
-                });
-            }
-        } catch (error) {
             
-        } finally {
             this.currentUser = null;
-            this.accessToken = null;
-            this.refreshToken = null;
-            this.tokenExpiryTime = null;
+            this.apiKey = null;
 
-            if (this.refreshTimer) {
-                clearTimeout(this.refreshTimer);
-                this.refreshTimer = null;
-            }
-
-            await this.clearTokensFromStorage();
+            await this.clearApiKeyFromStorage();
             await this.removeUserFromStorage();
 
-            
             await vscode.commands.executeCommand('setContext', 'berth.authenticated', false);
-        }
-    }
-
-    public async refreshAccessToken(): Promise<boolean> {
-        if (!this.refreshToken) {
-            return false;
-        }
-
-        try {
-            const apiClient = new ApiClient();
-
-            const response = await apiClient.post('/api/v1/auth/refresh', {
-                refresh_token: this.refreshToken
-            });
-
-            if (response.ok) {
-                const data = await response.json() as any;
-                this.accessToken = data.access_token;
-                this.refreshToken = data.refresh_token;
-
-                if (this.accessToken) {
-                    this.tokenExpiryTime = this.decodeJwtExpiry(this.accessToken);
-                    this.scheduleTokenRefresh();
-                }
-
-                if (this.accessToken && this.refreshToken) {
-                    await this.saveTokensToStorage(this.accessToken, this.refreshToken);
-                }
-
-                return true;
-            } else {
-                return false;
-            }
         } catch (error) {
-            return false;
+            
+            this.currentUser = null;
+            this.apiKey = null;
         }
     }
+
 
     public async checkAuthStatus(): Promise<boolean> {
         try {
-            if (!this.accessToken) {
+            if (!this.apiKey) {
                 return false;
             }
 
             const apiClient = new ApiClient();
-            apiClient.setAuthToken(this.accessToken);
+            apiClient.setAuthToken(this.apiKey);
 
             const response = await apiClient.get('/api/v1/profile');
 
             if (response.ok) {
                 const data = await response.json() as any;
                 this.currentUser = data;
-                await this.saveUserToStorage(this.currentUser!);
+                if (this.currentUser) {
+                    await this.saveUserToStorage(this.currentUser);
+                }
                 return true;
             } else if (response.status === 401) {
-                const refreshResult = await this.refreshAccessToken();
-
-                if (refreshResult) {
-                    apiClient.setAuthToken(this.accessToken!);
-                    const retryResponse = await apiClient.get('/api/v1/profile');
-
-                    if (retryResponse.ok) {
-                        const data = await retryResponse.json() as any;
-                        this.currentUser = data;
-                        if (this.currentUser) {
-                        await this.saveUserToStorage(this.currentUser);
-                    }
-                        return true;
-                    }
-                }
-
+                
                 await this.logout();
                 return false;
             } else {
@@ -360,14 +171,12 @@ export class AuthService {
         }
     }
 
-    private async saveTokensToStorage(accessToken: string, refreshToken: string): Promise<void> {
-        await this.secretStorage.store(AuthService.ACCESS_TOKEN_KEY, accessToken);
-        await this.secretStorage.store(AuthService.REFRESH_TOKEN_KEY, refreshToken);
+    private async saveApiKeyToStorage(apiKey: string): Promise<void> {
+        await this.secretStorage.store(AuthService.API_KEY_STORAGE_KEY, apiKey);
     }
 
-    private async clearTokensFromStorage(): Promise<void> {
-        await this.secretStorage.delete(AuthService.ACCESS_TOKEN_KEY);
-        await this.secretStorage.delete(AuthService.REFRESH_TOKEN_KEY);
+    private async clearApiKeyFromStorage(): Promise<void> {
+        await this.secretStorage.delete(AuthService.API_KEY_STORAGE_KEY);
     }
 
     private async saveUserToStorage(user: User): Promise<void> {

@@ -4,7 +4,6 @@ import * as https from 'https';
 export class ApiClient {
     private baseUrl: string;
     private authToken: string | null = null;
-    private tokenRefreshCallback: (() => Promise<boolean>) | null = null;
     private httpsAgent!: https.Agent;
 
     constructor() {
@@ -40,10 +39,6 @@ export class ApiClient {
 
     public clearAuthToken(): void {
         this.authToken = null;
-    }
-
-    public setTokenRefreshCallback(callback: () => Promise<boolean>): void {
-        this.tokenRefreshCallback = callback;
     }
 
     private getHeaders(additionalHeaders?: Record<string, string>): Record<string, string> {
@@ -116,22 +111,8 @@ export class ApiClient {
             options.body = JSON.stringify(body);
         }
 
-
         try {
-            let response = await fetch(url, options);
-
-            if (response.status === 401 && this.tokenRefreshCallback && this.authToken) {
-                const refreshSuccess = await this.tokenRefreshCallback();
-                if (refreshSuccess) {
-                    const retryOptions = this.getFetchOptions(additionalHeaders);
-                    retryOptions.method = method;
-                    if (body) {
-                        retryOptions.body = JSON.stringify(body);
-                    }
-                    response = await fetch(url, retryOptions);
-                }
-            }
-
+            const response = await fetch(url, options);
             return response;
         } catch (error) {
             throw error;
@@ -155,19 +136,7 @@ export class ApiClient {
         };
 
         try {
-            let response = await fetch(url, options);
-
-            // Handle 401 responses with token refresh
-            if (response.status === 401 && this.tokenRefreshCallback && this.authToken) {
-                const refreshSuccess = await this.tokenRefreshCallback();
-                if (refreshSuccess) {
-                    if (this.authToken) {
-                        headers['Authorization'] = `Bearer ${this.authToken}`;
-                    }
-                    response = await fetch(url, { ...options, headers });
-                }
-            }
-
+            const response = await fetch(url, options);
             return response;
         } catch (error) {
             throw error;
@@ -202,19 +171,7 @@ export class ApiClient {
         };
 
         try {
-            let response = await fetch(url, options);
-
-            // Handle 401 responses with token refresh
-            if (response.status === 401 && this.tokenRefreshCallback && this.authToken) {
-                const refreshSuccess = await this.tokenRefreshCallback();
-                if (refreshSuccess) {
-                    if (this.authToken) {
-                        headers['Authorization'] = `Bearer ${this.authToken}`;
-                    }
-                    response = await fetch(url, { ...options, headers });
-                }
-            }
-
+            const response = await fetch(url, options);
             return response;
         } catch (error) {
             throw error;

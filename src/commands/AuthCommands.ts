@@ -26,95 +26,51 @@ export class AuthCommands {
 
     public async login(): Promise<void> {
         try {
-            
             const config = vscode.workspace.getConfiguration('berth');
             const serverUrl = config.get<string>('serverUrl', 'https://localhost:8080');
 
-            const username = await vscode.window.showInputBox({
-                prompt: `Enter username for ${serverUrl}`,
-                placeHolder: 'username'
+            const apiKey = await vscode.window.showInputBox({
+                prompt: `Enter Berth API key for ${serverUrl}`,
+                placeHolder: 'brth_...',
+                password: true,
+                validateInput: (value) => {
+                    if (!value) {
+                        return 'API key is required';
+                    }
+                    if (!value.startsWith('brth_')) {
+                        return 'API key should start with "brth_"';
+                    }
+                    return null;
+                }
             });
 
-            if (!username) {
+            if (!apiKey) {
                 return;
             }
 
-            const password = await vscode.window.showInputBox({
-                prompt: 'Enter password',
-                password: true
-            });
-
-            if (!password) {
-                return;
-            }
-
-            
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Logging in to Berth...',
+                title: 'Authenticating with Berth...',
                 cancellable: false
             }, async () => {
-                const result = await this.authService.login(username, password);
+                const result = await this.authService.setApiKey(apiKey);
 
                 if (result.success) {
-                    if (result.totpRequired && result.temporaryToken) {
-                        
-                        await this.handleTOTPVerification(result.temporaryToken);
-                    } else {
-                        const token = this.authService.getAccessToken();
-                        if (token) {
-                            this.apiClient.setAuthToken(token);
-                        }
-
-                        vscode.window.showInformationMessage('Successfully logged in to Berth');
-                        this.treeDataProvider.refresh();
-                        this.authStateChangeCallback?.();
+                    const token = this.authService.getApiKey();
+                    if (token) {
+                        this.apiClient.setAuthToken(token);
                     }
+
+                    vscode.window.showInformationMessage('Successfully authenticated with Berth');
+                    this.treeDataProvider.refresh();
+                    this.authStateChangeCallback?.();
                 } else {
-                    vscode.window.showErrorMessage(`Login failed: ${result.message}`);
+                    vscode.window.showErrorMessage(`Authentication failed: ${result.message}`);
                 }
             });
         } catch (error) {
-            vscode.window.showErrorMessage(`Login error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            vscode.window.showErrorMessage(`Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-    }
-
-    private async handleTOTPVerification(temporaryToken: string): Promise<void> {
-        const totpCode = await vscode.window.showInputBox({
-            prompt: 'Enter your 6-digit TOTP code',
-            placeHolder: '123456',
-            validateInput: (value) => {
-                if (!/^\d{6}$/.test(value)) {
-                    return 'TOTP code must be 6 digits';
-                }
-                return null;
-            }
-        });
-
-        if (!totpCode) {
-            return;
-        }
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Verifying TOTP code...',
-            cancellable: false
-        }, async () => {
-            const result = await this.authService.verifyTOTP(temporaryToken, totpCode);
-
-            if (result.success) {
-                const token = this.authService.getAccessToken();
-                if (token) {
-                    this.apiClient.setAuthToken(token);
-                }
-
-                vscode.window.showInformationMessage('Successfully logged in to Berth');
-                this.treeDataProvider.refresh();
-                this.authStateChangeCallback?.();
-            } else {
-                vscode.window.showErrorMessage(`TOTP verification failed: ${result.message}`);
-            }
-        });
     }
 
     public async logout(): Promise<void> {
@@ -144,9 +100,9 @@ export class AuthCommands {
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const response = await this.apiClient.get('/api/v1/servers');
@@ -203,9 +159,9 @@ export class AuthCommands {
         }
 
         try {
-            const token = this.authService.getAccessToken();
-            if (token) {
-                this.apiClient.setAuthToken(token);
+            const apiKey = this.authService.getApiKey();
+            if (apiKey) {
+                this.apiClient.setAuthToken(apiKey);
             }
 
             const response = await this.apiClient.get(`/api/v1/servers/${currentServer.id}/stacks`);
@@ -261,9 +217,9 @@ export class AuthCommands {
             cancellable: false
         }, async (progress) => {
             try {
-                const token = this.authService.getAccessToken();
-                if (token) {
-                    this.apiClient.setAuthToken(token);
+                const apiKey = this.authService.getApiKey();
+                if (apiKey) {
+                    this.apiClient.setAuthToken(apiKey);
                 }
 
                 progress.report({ increment: 20, message: 'Fetching servers...' });

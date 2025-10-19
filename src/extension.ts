@@ -15,28 +15,17 @@ export async function activate(context: vscode.ExtensionContext) {
     const fileSystemProvider = new BerthFileSystemProvider(apiClient);
     const authCommands = new AuthCommands(authService, apiClient, treeDataProvider);
 
-    const syncTokenToApiClient = () => {
-        const token = authService.getAccessToken();
-        if (token) {
-            apiClient.setAuthToken(token);
+    const syncApiKeyToApiClient = () => {
+        const apiKey = authService.getApiKey();
+        if (apiKey) {
+            apiClient.setAuthToken(apiKey);
         } else {
             apiClient.clearAuthToken();
         }
         fileSystemProvider.refresh();
     };
 
-    const refreshCallback = async () => {
-        const success = await authService.refreshAccessToken();
-        if (success) {
-            syncTokenToApiClient();
-        }
-        return success;
-    };
-
-    authService.setTokenRefreshCallback(refreshCallback);
-    apiClient.setTokenRefreshCallback(refreshCallback);
-
-    authCommands.setAuthStateChangeCallback(syncTokenToApiClient);
+    authCommands.setAuthStateChangeCallback(syncApiKeyToApiClient);
 
     const treeView = vscode.window.createTreeView('berthServers', {
         treeDataProvider: treeDataProvider,
@@ -73,9 +62,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 try {
                     const filesService = new FilesService(apiClient);
 
-                    const token = authService.getAccessToken();
-                    if (token) {
-                        apiClient.setAuthToken(token);
+                    const apiKey = authService.getApiKey();
+                    if (apiKey) {
+                        apiClient.setAuthToken(apiKey);
                     }
 
                     const parentPath = filePath.split('/').slice(0, -1).join('/');
@@ -235,8 +224,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (event.affectsConfiguration('berth.serverUrl') ||
             event.affectsConfiguration('berth.trustSelfSignedCertificates')) {
             const newApiClient = new ApiClient();
-            if (authService.getAccessToken()) {
-                newApiClient.setAuthToken(authService.getAccessToken()!);
+            if (authService.getApiKey()) {
+                newApiClient.setAuthToken(authService.getApiKey()!);
             }
             vscode.window.showInformationMessage('Configuration updated. Please restart the extension for changes to take effect.');
         }
@@ -270,7 +259,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const isAuthenticated = await authService.initializeFromStorage();
 
         if (isAuthenticated) {
-            syncTokenToApiClient();
+            syncApiKeyToApiClient();
             const isValid = await authService.checkAuthStatus();
 
             if (isValid) {
