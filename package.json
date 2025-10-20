@@ -234,6 +234,14 @@
           "type": "boolean",
           "default": true,
           "description": "Trust self-signed certificates (useful for development)"
+        },
+        "berth.customHeaders": {
+          "type": "object",
+          "default": {},
+          "description": "Custom HTTP headers to include in all API requests",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

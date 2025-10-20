@@ -52,6 +52,15 @@ export class ApiClient {
       Accept: "application/json",
     };
 
+    const config = vscode.workspace.getConfiguration("berth");
+    const customHeaders = config.get<Record<string, string>>(
+      "customHeaders",
+      {},
+    );
+    if (customHeaders && typeof customHeaders === "object") {
+      Object.assign(headers, customHeaders);
+    }
+
     if (this.authToken) {
       headers["Authorization"] = `Bearer ${this.authToken}`;
     }
@@ -157,6 +166,16 @@ export class ApiClient {
     formData.append(fieldName, file);
 
     const headers: Record<string, string> = {};
+
+    const config = vscode.workspace.getConfiguration("berth");
+    const customHeaders = config.get<Record<string, string>>(
+      "customHeaders",
+      {},
+    );
+    if (customHeaders && typeof customHeaders === "object") {
+      Object.assign(headers, customHeaders);
+    }
+
     if (this.authToken) {
       headers["Authorization"] = `Bearer ${this.authToken}`;
     }
@@ -192,6 +211,16 @@ export class ApiClient {
     }
 
     const headers: Record<string, string> = {};
+
+    const config = vscode.workspace.getConfiguration("berth");
+    const customHeaders = config.get<Record<string, string>>(
+      "customHeaders",
+      {},
+    );
+    if (customHeaders && typeof customHeaders === "object") {
+      Object.assign(headers, customHeaders);
+    }
+
     if (this.authToken) {
       headers["Authorization"] = `Bearer ${this.authToken}`;
     }

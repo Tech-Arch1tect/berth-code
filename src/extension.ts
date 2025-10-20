@@ -262,7 +262,8 @@ export async function activate(context: vscode.ExtensionContext) {
     (event) => {
       if (
         event.affectsConfiguration("berth.serverUrl") ||
-        event.affectsConfiguration("berth.trustSelfSignedCertificates")
+        event.affectsConfiguration("berth.trustSelfSignedCertificates") ||
+        event.affectsConfiguration("berth.customHeaders")
       ) {
         const newApiClient = new ApiClient();
         if (authService.getApiKey()) {
