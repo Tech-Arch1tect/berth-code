@@ -7,13 +7,36 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
     vscode.FileChangeEvent[]
   >();
   private filesService: FilesService;
+  private _authReadyPromise: Promise<void> | null = null;
+  private _resolveAuthReady: (() => void) | null = null;
 
   constructor(private apiClient: ApiClient) {
     this.filesService = new FilesService(apiClient);
+    this._authReadyPromise = new Promise((resolve) => {
+      this._resolveAuthReady = resolve;
+      setTimeout(() => resolve(), 5000);
+    });
+  }
+
+  public markAuthReady(): void {
+    if (this._resolveAuthReady) {
+      this._resolveAuthReady();
+      this._resolveAuthReady = null;
+    }
   }
 
   private isAuthenticated(): boolean {
     return this.apiClient.getAuthToken() !== null;
+  }
+
+  private async waitForAuth(): Promise<boolean> {
+    if (this.isAuthenticated()) {
+      return true;
+    }
+    if (this._authReadyPromise) {
+      await this._authReadyPromise;
+    }
+    return this.isAuthenticated();
   }
 
   public refresh(): void {
@@ -28,8 +51,9 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
     return new vscode.Disposable(() => {});
   }
 
-  stat(uri: vscode.Uri): vscode.FileStat | Thenable<vscode.FileStat> {
-    if (!this.isAuthenticated()) {
+  async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
+    const authenticated = await this.waitForAuth();
+    if (!authenticated) {
       throw vscode.FileSystemError.Unavailable(
         "Not authenticated to Berth server",
       );
@@ -37,10 +61,11 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
     return this.getFileStat(uri);
   }
 
-  readDirectory(
+  async readDirectory(
     uri: vscode.Uri,
-  ): [string, vscode.FileType][] | Thenable<[string, vscode.FileType][]> {
-    if (!this.isAuthenticated()) {
+  ): Promise<[string, vscode.FileType][]> {
+    const authenticated = await this.waitForAuth();
+    if (!authenticated) {
       throw vscode.FileSystemError.Unavailable(
         "Not authenticated to Berth server",
       );

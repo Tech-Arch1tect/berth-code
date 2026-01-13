@@ -11,6 +11,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onFileSystem:berth",
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",

@@ -10,8 +10,18 @@ import { AuthCommands } from "./commands/AuthCommands";
 export async function activate(context: vscode.ExtensionContext) {
   const apiClient = new ApiClient();
   const authService = new AuthService(context.secrets, context);
+
   const treeDataProvider = new BerthTreeDataProvider(authService, apiClient);
   const fileSystemProvider = new BerthFileSystemProvider(apiClient);
+
+  const wasAuthenticated = await authService.initializeFromStorage();
+  if (wasAuthenticated) {
+    const apiKey = authService.getApiKey();
+    if (apiKey) {
+      apiClient.setAuthToken(apiKey);
+    }
+  }
+  fileSystemProvider.markAuthReady();
   const authCommands = new AuthCommands(
     authService,
     apiClient,
@@ -304,21 +314,13 @@ export async function activate(context: vscode.ExtensionContext) {
     updateStatusBar();
   });
 
-  const initializeAuth = async () => {
-    const isAuthenticated = await authService.initializeFromStorage();
-
-    if (isAuthenticated) {
-      syncApiKeyToApiClient();
-      const isValid = await authService.checkAuthStatus();
-
-      if (isValid) {
-        treeDataProvider.refresh();
-        updateStatusBar();
-      }
+  if (wasAuthenticated) {
+    const isValid = await authService.checkAuthStatus();
+    if (isValid) {
+      treeDataProvider.refresh();
+      updateStatusBar();
     }
-  };
-
-  initializeAuth();
+  }
 
   context.subscriptions.push(
     treeView,
