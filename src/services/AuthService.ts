@@ -170,11 +170,9 @@ export class AuthService {
         await this.logout();
         return false;
       } else {
-        await this.logout();
         return false;
       }
     } catch (error) {
-      await this.logout();
       return false;
     }
   }
