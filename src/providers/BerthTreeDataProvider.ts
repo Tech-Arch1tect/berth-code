@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { AuthService } from "../services/AuthService";
-import { ApiClient } from "../services/ApiClient";
 import { FilesService } from "../services/FilesService";
+import { getApiV1Servers } from "berth-api-client/servers/servers";
+import { getApiV1ServersServeridStacks } from "berth-api-client/stacks/stacks";
+import type { ServerResponse, Stack as ApiStack } from "berth-api-client/models";
 import {
   Server,
   Stack,
@@ -165,9 +167,7 @@ export class BerthTreeItemImpl extends vscode.TreeItem {
   }
 }
 
-export class BerthTreeDataProvider
-  implements vscode.TreeDataProvider<BerthTreeItemImpl>
-{
+export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeItemImpl> {
   private _onDidChangeTreeData: vscode.EventEmitter<
     BerthTreeItemImpl | undefined | null | void
   > = new vscode.EventEmitter<BerthTreeItemImpl | undefined | null | void>();
@@ -177,11 +177,8 @@ export class BerthTreeDataProvider
 
   private filesService: FilesService;
 
-  constructor(
-    private authService: AuthService,
-    private apiClient: ApiClient,
-  ) {
-    this.filesService = new FilesService(apiClient);
+  constructor(private authService: AuthService) {
+    this.filesService = new FilesService();
   }
 
   private currentServer: Server | null = null;
@@ -244,11 +241,6 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       const filePath = parentPath ? `${parentPath}/${fileName}` : fileName;
 
       await this.filesService.writeFile(targetServer.id, targetStack.name, {
@@ -304,11 +296,6 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       const folderPath = parentPath
         ? `${parentPath}/${folderName}`
         : folderName;
@@ -355,11 +342,6 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       await this.filesService.deleteFile(server.id, stack.name, {
         path: fileEntry.path,
       });
@@ -397,19 +379,16 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       const pathSegments = fileEntry.path.split("/");
       pathSegments[pathSegments.length - 1] = newName;
       const newPath = pathSegments.join("/");
 
-      await this.filesService.renameFile(server.id, stack.name, {
-        oldPath: fileEntry.path,
-        newPath: newPath,
-      });
+      await this.filesService.renameFile(
+        server.id,
+        stack.name,
+        fileEntry.path,
+        newPath,
+      );
 
       this.refresh();
       vscode.window.showInformationMessage(
@@ -466,11 +445,6 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       for (const fileUri of files) {
         const fileName = fileUri.path.split("/").pop() || "unknown";
         const fileData = await vscode.workspace.fs.readFile(fileUri);
@@ -512,11 +486,6 @@ export class BerthTreeDataProvider
     const stack = item.data.stack;
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       const saveUri = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file(fileEntry.name),
         saveLabel: "Download",
@@ -533,7 +502,8 @@ export class BerthTreeDataProvider
         fileEntry.name,
       );
 
-      await vscode.workspace.fs.writeFile(saveUri, new Uint8Array(fileData));
+      const arrayBuffer = await fileData.arrayBuffer();
+      await vscode.workspace.fs.writeFile(saveUri, new Uint8Array(arrayBuffer));
       vscode.window.showInformationMessage(
         `File downloaded to ${saveUri.fsPath}`,
       );
@@ -598,11 +568,6 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       await this.filesService.chmodFile(server.id, stack.name, {
         path: fileEntry.path,
         mode: newMode.startsWith("0") ? newMode : `0${newMode}`,
@@ -684,11 +649,6 @@ export class BerthTreeDataProvider
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       const ownerId = ownerInput.trim()
         ? parseInt(ownerInput.trim())
         : undefined;
@@ -766,23 +726,15 @@ export class BerthTreeDataProvider
 
   private async getServers(): Promise<BerthTreeItemImpl[]> {
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
-      const response = await this.apiClient.get("/api/v1/servers");
-      if (!response.ok) {
-        throw new Error(`Failed to fetch servers: ${response.status}`);
-      }
-
-      const responseData = (await response.json()) as any;
-      let servers: Server[];
-      if (Array.isArray(responseData)) {
-        servers = responseData;
-      } else {
-        servers = responseData.servers || [];
-      }
+      const response = await getApiV1Servers();
+      const servers: Server[] = (response.data.servers || []).map((s: ServerResponse) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description || undefined,
+        host: s.host,
+        port: s.port,
+        status: s.is_active ? "active" : "inactive",
+      }));
 
       return servers.map(
         (server) =>
@@ -814,27 +766,14 @@ export class BerthTreeDataProvider
 
   private async getStacks(server: Server): Promise<BerthTreeItemImpl[]> {
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
+      const response = await getApiV1ServersServeridStacks(server.id);
+      const stacks: Stack[] = (response.data.stacks || []).map((s: ApiStack) => ({
+        name: s.name,
+        status: s.is_healthy ? "healthy" : "unhealthy",
+        serverId: s.server_id,
+      }));
 
-      const response = await this.apiClient.get(
-        `/api/v1/servers/${server.id}/stacks`,
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to fetch stacks: ${response.status}`);
-      }
-
-      const responseData = (await response.json()) as any;
-      let stacks: Stack[];
-      if (Array.isArray(responseData)) {
-        stacks = responseData;
-      } else {
-        stacks = responseData.stacks || [];
-      }
-
-      if (!stacks || stacks.length === 0) {
+      if (stacks.length === 0) {
         return [
           new BerthTreeItemImpl(
             "No stacks available",
@@ -846,7 +785,6 @@ export class BerthTreeDataProvider
                 name: "none",
                 status: "none",
                 serverId: server.id,
-                services: [],
               },
             },
           ),
@@ -873,7 +811,6 @@ export class BerthTreeDataProvider
               name: "error",
               status: "error",
               serverId: server.id,
-              services: [],
             },
           },
         ),
@@ -887,11 +824,6 @@ export class BerthTreeDataProvider
     path?: string,
   ): Promise<BerthTreeItemImpl[]> {
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
       const listing = await this.filesService.listDirectory(
         server.id,
         stack.name,

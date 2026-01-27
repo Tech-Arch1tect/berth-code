@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { ApiClient } from "../services/ApiClient";
 import { FilesService } from "../services/FilesService";
+import { getAuthToken } from "../lib/api";
 
 export class BerthFileSystemProvider implements vscode.FileSystemProvider {
   private _onDidChangeFile = new vscode.EventEmitter<
@@ -10,8 +10,8 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
   private _authReadyPromise: Promise<void> | null = null;
   private _resolveAuthReady: (() => void) | null = null;
 
-  constructor(private apiClient: ApiClient) {
-    this.filesService = new FilesService(apiClient);
+  constructor() {
+    this.filesService = new FilesService();
     this._authReadyPromise = new Promise((resolve) => {
       this._resolveAuthReady = resolve;
       setTimeout(() => resolve(), 5000);
@@ -26,7 +26,7 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
   }
 
   private isAuthenticated(): boolean {
-    return this.apiClient.getAuthToken() !== null;
+    return getAuthToken() !== undefined;
   }
 
   private async waitForAuth(): Promise<boolean> {
@@ -61,9 +61,7 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
     return this.getFileStat(uri);
   }
 
-  async readDirectory(
-    uri: vscode.Uri,
-  ): Promise<[string, vscode.FileType][]> {
+  async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
     const authenticated = await this.waitForAuth();
     if (!authenticated) {
       throw vscode.FileSystemError.Unavailable(
@@ -129,6 +127,7 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
       const serverId = parseInt(uri.authority);
       const stackName = pathParts[0];
       const filePath = pathParts.slice(1).join("/");
+      const fileName = pathParts[pathParts.length - 1];
 
       if (isNaN(serverId)) {
         throw new Error("Invalid server ID in URI");
@@ -139,12 +138,14 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
         throw vscode.FileSystemError.FileIsADirectory(uri);
       }
 
-      const fileContent = await this.filesService.readFile(
+      const blob = await this.filesService.downloadFile(
         serverId,
         stackName,
         filePath,
+        fileName,
       );
-      return new TextEncoder().encode(fileContent.content);
+      const arrayBuffer = await blob.arrayBuffer();
+      return new Uint8Array(arrayBuffer);
     } catch (error) {
       if (error instanceof vscode.FileSystemError) {
         throw error;
@@ -383,12 +384,7 @@ export class BerthFileSystemProvider implements vscode.FileSystemProvider {
         throw new Error("Invalid file paths for rename operation");
       }
 
-      const renameRequest = {
-        oldPath: oldPath,
-        newPath: newPath,
-      };
-
-      await this.filesService.renameFile(serverId, stackName, renameRequest);
+      await this.filesService.renameFile(serverId, stackName, oldPath, newPath);
 
       this._onDidChangeFile.fire([
         {

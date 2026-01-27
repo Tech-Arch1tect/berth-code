@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { FilesService } from "../services/FilesService";
-import { ApiClient } from "../services/ApiClient";
 
 export class BerthFileDecorationProvider
   implements vscode.FileDecorationProvider
@@ -12,8 +11,8 @@ export class BerthFileDecorationProvider
 
   private filesService: FilesService;
 
-  constructor(private apiClient: ApiClient) {
-    this.filesService = new FilesService(apiClient);
+  constructor() {
+    this.filesService = new FilesService();
   }
 
   async provideFileDecoration(

@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { AuthService } from "../services/AuthService";
-import { ApiClient } from "../services/ApiClient";
+import { setAuthToken } from "../lib/api";
+import { getApiV1Servers } from "berth-api-client/servers/servers";
+import { getApiV1ServersServeridStacks } from "berth-api-client/stacks/stacks";
+import type { ServerResponse, Stack as ApiStack } from "berth-api-client/models";
 import { Server, Stack } from "../types";
 
 interface TreeDataProvider {
@@ -16,7 +19,6 @@ export class AuthCommands {
 
   constructor(
     private authService: AuthService,
-    private apiClient: ApiClient,
     private treeDataProvider: TreeDataProvider,
   ) {}
 
@@ -61,11 +63,6 @@ export class AuthCommands {
           const result = await this.authService.setApiKey(apiKey);
 
           if (result.success) {
-            const token = this.authService.getApiKey();
-            if (token) {
-              this.apiClient.setAuthToken(token);
-            }
-
             vscode.window.showInformationMessage(
               "Successfully authenticated with Berth",
             );
@@ -98,8 +95,6 @@ export class AuthCommands {
         },
       );
 
-      this.apiClient.clearAuthToken();
-
       vscode.window.showInformationMessage(
         "Successfully logged out from Berth",
       );
@@ -119,24 +114,15 @@ export class AuthCommands {
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
-
-      const response = await this.apiClient.get("/api/v1/servers");
-      if (!response.ok) {
-        throw new Error(`Failed to fetch servers: ${response.status}`);
-      }
-
-      const responseData = (await response.json()) as any;
-
-      let servers: Server[];
-      if (Array.isArray(responseData)) {
-        servers = responseData;
-      } else {
-        servers = responseData.servers || [];
-      }
+      const response = await getApiV1Servers();
+      const servers: Server[] = (response.data.servers || []).map((s: ServerResponse) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description || undefined,
+        host: s.host,
+        port: s.port,
+        status: s.is_active ? "active" : "inactive",
+      }));
 
       if (servers.length === 0) {
         vscode.window.showInformationMessage("No servers available");
@@ -182,29 +168,14 @@ export class AuthCommands {
     }
 
     try {
-      const apiKey = this.authService.getApiKey();
-      if (apiKey) {
-        this.apiClient.setAuthToken(apiKey);
-      }
+      const response = await getApiV1ServersServeridStacks(currentServer.id);
+      const stacks: Stack[] = (response.data.stacks || []).map((s: ApiStack) => ({
+        name: s.name,
+        status: s.is_healthy ? "healthy" : "unhealthy",
+        serverId: s.server_id,
+      }));
 
-      const response = await this.apiClient.get(
-        `/api/v1/servers/${currentServer.id}/stacks`,
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch stacks: ${response.status}`);
-      }
-
-      const responseData = (await response.json()) as any;
-
-      let stacks: Stack[];
-      if (Array.isArray(responseData)) {
-        stacks = responseData;
-      } else {
-        stacks = responseData.stacks || [];
-      }
-
-      if (!stacks || stacks.length === 0) {
+      if (stacks.length === 0) {
         vscode.window.showInformationMessage(
           "No stacks available on this server",
         );
@@ -214,7 +185,7 @@ export class AuthCommands {
       const stackItems = stacks.map((stack) => ({
         label: stack.name,
         description: stack.status || "Unknown",
-        detail: `${stack.services ? stack.services.length : 0} service(s)`,
+        detail: stack.status,
         stack: stack,
       }));
 
@@ -250,27 +221,19 @@ export class AuthCommands {
       },
       async (progress) => {
         try {
-          const apiKey = this.authService.getApiKey();
-          if (apiKey) {
-            this.apiClient.setAuthToken(apiKey);
-          }
-
           progress.report({ increment: 20, message: "Fetching servers..." });
 
-          const serversResponse = await this.apiClient.get("/api/v1/servers");
-          if (!serversResponse.ok) {
-            throw new Error(
-              `Failed to fetch servers: ${serversResponse.status}`,
-            );
-          }
-
-          const serversData = (await serversResponse.json()) as any;
-          let servers: Server[];
-          if (Array.isArray(serversData)) {
-            servers = serversData;
-          } else {
-            servers = serversData.servers || [];
-          }
+          const serversResponse = await getApiV1Servers();
+          const servers: Server[] = (serversResponse.data.servers || []).map(
+            (s: ServerResponse) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description || undefined,
+              host: s.host,
+              port: s.port,
+              status: s.is_active ? "active" : "inactive",
+            }),
+          );
 
           if (servers.length === 0) {
             vscode.window.showInformationMessage("No servers available");
@@ -303,22 +266,18 @@ export class AuthCommands {
 
           progress.report({ increment: 20, message: "Fetching stacks..." });
 
-          const stacksResponse = await this.apiClient.get(
-            `/api/v1/servers/${selectedServerItem.server.id}/stacks`,
+          const stacksResponse = await getApiV1ServersServeridStacks(
+            selectedServerItem.server.id,
           );
-          if (!stacksResponse.ok) {
-            throw new Error(`Failed to fetch stacks: ${stacksResponse.status}`);
-          }
+          const stacks: Stack[] = (stacksResponse.data.stacks || []).map(
+            (s: ApiStack) => ({
+              name: s.name,
+              status: s.is_healthy ? "healthy" : "unhealthy",
+              serverId: s.server_id,
+            }),
+          );
 
-          const stacksData = (await stacksResponse.json()) as any;
-          let stacks: Stack[];
-          if (Array.isArray(stacksData)) {
-            stacks = stacksData;
-          } else {
-            stacks = stacksData.stacks || [];
-          }
-
-          if (!stacks || stacks.length === 0) {
+          if (stacks.length === 0) {
             this.treeDataProvider.setCurrentServer(selectedServerItem.server);
             this.treeDataProvider.setCurrentStack(null);
             vscode.window.showInformationMessage(
@@ -334,7 +293,7 @@ export class AuthCommands {
           const stackItems = stacks.map((stack) => ({
             label: stack.name,
             description: stack.status || "Unknown",
-            detail: `${stack.services ? stack.services.length : 0} service(s)`,
+            detail: stack.status,
             picked: currentStack?.name === stack.name,
             stack: stack,
           }));

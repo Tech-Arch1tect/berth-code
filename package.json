@@ -259,7 +259,12 @@
     "lint": "eslint src",
     "test": "vscode-test"
   },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "berth-api-client": "git+https://github.com/Tech-Arch1tect/berth-api-client.git"
+  },
   "devDependencies": {
+    "@tanstack/react-query": "^5.79.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.104.0",

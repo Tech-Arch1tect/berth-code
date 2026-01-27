@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { AuthService } from "./services/AuthService";
-import { ApiClient } from "./services/ApiClient";
 import { FilesService } from "./services/FilesService";
 import { BerthTreeDataProvider } from "./providers/BerthTreeDataProvider";
 import { BerthFileSystemProvider } from "./providers/BerthFileSystemProvider";
@@ -8,37 +7,20 @@ import { BerthFileDecorationProvider } from "./providers/BerthFileDecorationProv
 import { AuthCommands } from "./commands/AuthCommands";
 
 export async function activate(context: vscode.ExtensionContext) {
-  const apiClient = new ApiClient();
   const authService = new AuthService(context.secrets, context);
 
-  const treeDataProvider = new BerthTreeDataProvider(authService, apiClient);
-  const fileSystemProvider = new BerthFileSystemProvider(apiClient);
+  const treeDataProvider = new BerthTreeDataProvider(authService);
+  const fileSystemProvider = new BerthFileSystemProvider();
 
   const wasAuthenticated = await authService.initializeFromStorage();
-  if (wasAuthenticated) {
-    const apiKey = authService.getApiKey();
-    if (apiKey) {
-      apiClient.setAuthToken(apiKey);
-    }
-  }
   fileSystemProvider.markAuthReady();
-  const authCommands = new AuthCommands(
-    authService,
-    apiClient,
-    treeDataProvider,
-  );
+  const authCommands = new AuthCommands(authService, treeDataProvider);
 
-  const syncApiKeyToApiClient = () => {
-    const apiKey = authService.getApiKey();
-    if (apiKey) {
-      apiClient.setAuthToken(apiKey);
-    } else {
-      apiClient.clearAuthToken();
-    }
+  const onAuthStateChange = () => {
     fileSystemProvider.refresh();
   };
 
-  authCommands.setAuthStateChangeCallback(syncApiKeyToApiClient);
+  authCommands.setAuthStateChangeCallback(onAuthStateChange);
 
   const treeView = vscode.window.createTreeView("berthServers", {
     treeDataProvider: treeDataProvider,
@@ -83,12 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
         command === "renameFile"
       ) {
         try {
-          const filesService = new FilesService(apiClient);
-
-          const apiKey = authService.getApiKey();
-          if (apiKey) {
-            apiClient.setAuthToken(apiKey);
-          }
+          const filesService = new FilesService();
 
           const parentPath = filePath.split("/").slice(0, -1).join("/");
           const fileName = uri.path.split("/").pop() || "";
@@ -263,7 +240,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   ];
 
-  const fileDecorationProvider = new BerthFileDecorationProvider(apiClient);
+  const fileDecorationProvider = new BerthFileDecorationProvider();
   const fileDecorationProviderDisposable =
     vscode.window.registerFileDecorationProvider(fileDecorationProvider);
   context.subscriptions.push(fileDecorationProviderDisposable);
@@ -275,13 +252,7 @@ export async function activate(context: vscode.ExtensionContext) {
         event.affectsConfiguration("berth.trustSelfSignedCertificates") ||
         event.affectsConfiguration("berth.customHeaders")
       ) {
-        const newApiClient = new ApiClient();
-        if (authService.getApiKey()) {
-          newApiClient.setAuthToken(authService.getApiKey()!);
-        }
-        vscode.window.showInformationMessage(
-          "Configuration updated. Please restart the extension for changes to take effect.",
-        );
+        vscode.window.showInformationMessage("Berth configuration updated.");
       }
     },
   );

@@ -1,43 +1,81 @@
-import { ApiClient } from "./ApiClient";
 import {
-  DirectoryListing,
-  FileContent,
-  WriteFileRequest,
-  CreateDirectoryRequest,
-  DeleteRequest,
-  RenameRequest,
-  CopyRequest,
-  ChmodRequest,
-  ChownRequest,
-  DirectoryStats,
-} from "../types";
+  getApiV1ServersServeridStacksStacknameFiles,
+  getApiV1ServersServeridStacksStacknameFilesRead,
+  postApiV1ServersServeridStacksStacknameFilesWrite,
+  postApiV1ServersServeridStacksStacknameFilesMkdir,
+  deleteApiV1ServersServeridStacksStacknameFilesDelete,
+  postApiV1ServersServeridStacksStacknameFilesRename,
+  postApiV1ServersServeridStacksStacknameFilesCopy,
+  postApiV1ServersServeridStacksStacknameFilesUpload,
+  getApiV1ServersServeridStacksStacknameFilesDownload,
+  postApiV1ServersServeridStacksStacknameFilesChmod,
+  postApiV1ServersServeridStacksStacknameFilesChown,
+  getApiV1ServersServeridStacksStacknameFilesStats,
+} from "berth-api-client/files/files";
+import type {
+  DirectoryListing as ApiDirectoryListing,
+  FileContent as ApiFileContent,
+  DirectoryStats as ApiDirectoryStats,
+  FileEntry as ApiFileEntry,
+} from "berth-api-client/models";
+
+export interface FileEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size: number;
+  displaySize: string;
+  modTime: string;
+  mode: string;
+  ownerId?: number;
+  groupId?: number;
+  owner?: string;
+  group?: string;
+  extension?: string;
+}
+
+export interface DirectoryListing {
+  path: string;
+  entries: FileEntry[];
+}
+
+export interface FileContent {
+  path: string;
+  content: string;
+  encoding: string;
+  size: number;
+}
+
+export interface DirectoryStats {
+  totalFiles: number;
+  totalDirectories: number;
+  totalSize: number;
+  mostCommonMode?: string;
+  mostCommonOwner?: number;
+  mostCommonGroup?: number;
+}
 
 export class FilesService {
-  constructor(private apiClient: ApiClient) {}
-
   public async listDirectory(
     serverId: number,
     stackName: string,
     path?: string,
   ): Promise<DirectoryListing> {
-    const queryParam = path ? `?path=${encodeURIComponent(path)}` : "";
-    const response = await this.apiClient.get(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files${queryParam}`,
+    const response = await getApiV1ServersServeridStacksStacknameFiles(
+      serverId,
+      stackName,
+      path ? { path } : undefined,
     );
 
-    if (!response.ok) {
-      await this.handleError(response, "Failed to list directory");
-    }
-
-    const rawData = (await response.json()) as any;
+    const rawData = response.data;
 
     if (!rawData) {
       return { path: "", entries: [] };
     }
 
-    const transformedData: DirectoryListing = {
+    return {
       path: rawData.path || "",
-      entries: (rawData.entries || []).map((entry: any) => ({
+      entries: (rawData.entries || []).map((entry: ApiFileEntry) => ({
         name: entry.name || "",
         path: entry.path || "",
         isDirectory: entry.is_directory === true,
@@ -55,8 +93,6 @@ export class FilesService {
             : undefined,
       })),
     };
-
-    return transformedData;
   }
 
   public async readFile(
@@ -64,118 +100,116 @@ export class FilesService {
     stackName: string,
     path: string,
   ): Promise<FileContent> {
-    const response = await this.apiClient.get(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/read?path=${encodeURIComponent(path)}`,
+    const response = await getApiV1ServersServeridStacksStacknameFilesRead(
+      serverId,
+      stackName,
+      { path },
     );
 
-    if (!response.ok) {
-      await this.handleError(response, "Failed to read file");
-    }
-
-    return (await response.json()) as FileContent;
+    const data = response.data;
+    return {
+      path: data.path,
+      content: data.content,
+      encoding: data.encoding,
+      size: data.size,
+    };
   }
 
   public async writeFile(
     serverId: number,
     stackName: string,
-    request: WriteFileRequest,
+    request: {
+      path: string;
+      content: string;
+      mode?: string;
+      owner_id?: number;
+      group_id?: number;
+    },
   ): Promise<void> {
-    const response = await this.apiClient.post(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/write`,
+    await postApiV1ServersServeridStacksStacknameFilesWrite(
+      serverId,
+      stackName,
       request,
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to write file");
-    }
   }
 
   public async createDirectory(
     serverId: number,
     stackName: string,
-    request: CreateDirectoryRequest,
+    request: {
+      path: string;
+      mode?: string;
+      owner_id?: number;
+      group_id?: number;
+    },
   ): Promise<void> {
-    const response = await this.apiClient.post(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/mkdir`,
+    await postApiV1ServersServeridStacksStacknameFilesMkdir(
+      serverId,
+      stackName,
       request,
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to create directory");
-    }
   }
 
   public async deleteFile(
     serverId: number,
     stackName: string,
-    request: DeleteRequest,
+    request: { path: string },
   ): Promise<void> {
-    const response = await this.apiClient.deleteWithBody(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/delete`,
+    await deleteApiV1ServersServeridStacksStacknameFilesDelete(
+      serverId,
+      stackName,
       request,
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to delete");
-    }
   }
 
   public async renameFile(
     serverId: number,
     stackName: string,
-    request: RenameRequest,
+    oldPath: string,
+    newPath: string,
   ): Promise<void> {
-    const apiRequest = {
-      old_path: request.oldPath,
-      new_path: request.newPath,
-    };
-
-    const response = await this.apiClient.post(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/rename`,
-      apiRequest,
+    await postApiV1ServersServeridStacksStacknameFilesRename(
+      serverId,
+      stackName,
+      {
+        old_path: oldPath,
+        new_path: newPath,
+      },
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to rename");
-    }
   }
 
   public async copyFile(
     serverId: number,
     stackName: string,
-    request: CopyRequest,
+    sourcePath: string,
+    targetPath: string,
   ): Promise<void> {
-    const response = await this.apiClient.post(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/copy`,
-      request,
+    await postApiV1ServersServeridStacksStacknameFilesCopy(
+      serverId,
+      stackName,
+      {
+        source_path: sourcePath,
+        target_path: targetPath,
+      },
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to copy");
-    }
   }
 
   public async uploadFile(
     serverId: number,
     stackName: string,
     path: string,
-    file: File,
+    file: Blob,
     filename: string,
   ): Promise<void> {
-    const fields: Record<string, string> = {};
     const filePath = path ? `${path}/${filename}` : filename;
-    fields["path"] = filePath;
-
-    const response = await this.apiClient.postMultipartWithFields(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/upload`,
-      file,
-      "file",
-      fields,
+    await postApiV1ServersServeridStacksStacknameFilesUpload(
+      serverId,
+      stackName,
+      {
+        file,
+        path: filePath,
+      },
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to upload file");
-    }
   }
 
   public async downloadFile(
@@ -183,51 +217,42 @@ export class FilesService {
     stackName: string,
     path: string,
     filename?: string,
-  ): Promise<ArrayBuffer> {
-    const queryParams = new URLSearchParams({ path });
-    if (filename) {
-      queryParams.set("filename", filename);
-    }
-
-    const response = await this.apiClient.get(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/download?${queryParams}`,
+  ): Promise<Blob> {
+    const response = await getApiV1ServersServeridStacksStacknameFilesDownload(
+      serverId,
+      stackName,
+      { path, filename },
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to download file");
-    }
-
-    return await response.arrayBuffer();
+    return response.data;
   }
 
   public async chmodFile(
     serverId: number,
     stackName: string,
-    request: ChmodRequest,
+    request: { path: string; mode: string; recursive: boolean },
   ): Promise<void> {
-    const response = await this.apiClient.post(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/chmod`,
+    await postApiV1ServersServeridStacksStacknameFilesChmod(
+      serverId,
+      stackName,
       request,
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to change permissions");
-    }
   }
 
   public async chownFile(
     serverId: number,
     stackName: string,
-    request: ChownRequest,
+    request: {
+      path: string;
+      owner_id?: number;
+      group_id?: number;
+      recursive: boolean;
+    },
   ): Promise<void> {
-    const response = await this.apiClient.post(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/chown`,
+    await postApiV1ServersServeridStacksStacknameFilesChown(
+      serverId,
+      stackName,
       request,
     );
-
-    if (!response.ok) {
-      await this.handleError(response, "Failed to change ownership");
-    }
   }
 
   public async getDirectoryStats(
@@ -235,38 +260,21 @@ export class FilesService {
     stackName: string,
     path?: string,
   ): Promise<DirectoryStats> {
-    const queryParam = path ? `?path=${encodeURIComponent(path)}` : "";
-    const response = await this.apiClient.get(
-      `/api/v1/servers/${serverId}/stacks/${stackName}/files/stats${queryParam}`,
+    const response = await getApiV1ServersServeridStacksStacknameFilesStats(
+      serverId,
+      stackName,
+      path ? { path } : undefined,
     );
 
-    if (!response.ok) {
-      await this.handleError(response, "Failed to get directory stats");
-    }
-
-    return (await response.json()) as DirectoryStats;
-  }
-
-  private async handleError(
-    response: Response,
-    defaultMessage: string,
-  ): Promise<never> {
-    let errorMessage = defaultMessage;
-
-    try {
-      const errorData = (await response.json()) as any;
-      errorMessage = errorData.error || errorData.message || defaultMessage;
-    } catch {}
-
-    if (response.status === 401) {
-      errorMessage = "Authentication failed";
-    } else if (response.status === 403) {
-      errorMessage = "Access denied - insufficient permissions";
-    } else if (response.status === 404) {
-      errorMessage = "Resource not found";
-    }
-
-    throw new Error(`${errorMessage}: ${response.status}`);
+    const data = response.data;
+    return {
+      totalFiles: data.total_files ?? 0,
+      totalDirectories: data.total_directories ?? 0,
+      totalSize: data.total_size ?? 0,
+      mostCommonMode: data.most_common_mode,
+      mostCommonOwner: data.most_common_owner,
+      mostCommonGroup: data.most_common_group,
+    };
   }
 
   private formatFileSize(bytes: number): string {

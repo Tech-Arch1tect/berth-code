@@ -1,28 +1,19 @@
 import * as vscode from "vscode";
-import { ApiClient } from "./ApiClient";
-
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  totpEnabled: boolean;
-  emailVerified: boolean;
-  permissions: string[];
-}
+import { setAuthToken, getAuthToken } from "../lib/api";
+import { getApiV1Profile } from "berth-api-client/profile/profile";
+import type { UserInfo } from "berth-api-client/models";
 
 export interface AuthResponse {
   success: boolean;
   message: string;
-  user?: User;
+  user?: UserInfo;
 }
 
 export class AuthService {
   private static readonly API_KEY_STORAGE_KEY = "berth.apiKey";
   private static readonly USER_KEY = "berth.user";
 
-  private currentUser: User | null = null;
+  private currentUser: UserInfo | null = null;
   private apiKey: string | null = null;
 
   constructor(
@@ -34,7 +25,7 @@ export class AuthService {
     return this.apiKey;
   }
 
-  public getCurrentUser(): User | null {
+  public getCurrentUser(): UserInfo | null {
     return this.currentUser;
   }
 
@@ -55,6 +46,8 @@ export class AuthService {
 
       this.apiKey = apiKey;
       this.currentUser = JSON.parse(userJson);
+
+      setAuthToken(this.apiKey);
 
       await vscode.commands.executeCommand(
         "setContext",
@@ -79,46 +72,40 @@ export class AuthService {
       }
 
       this.apiKey = apiKey;
-      const apiClient = new ApiClient();
-      apiClient.setAuthToken(this.apiKey);
+      setAuthToken(this.apiKey);
 
-      const response = await apiClient.get("/api/v1/profile");
+      const response = await getApiV1Profile();
+      this.currentUser = response.data.data;
 
-      if (response.ok) {
-        const data = (await response.json()) as any;
-        this.currentUser = data;
+      await this.saveApiKeyToStorage(this.apiKey);
+      if (this.currentUser) {
+        await this.saveUserToStorage(this.currentUser);
+      }
 
-        await this.saveApiKeyToStorage(this.apiKey);
-        if (this.currentUser) {
-          await this.saveUserToStorage(this.currentUser);
-        }
+      await vscode.commands.executeCommand(
+        "setContext",
+        "berth.authenticated",
+        true,
+      );
 
-        await vscode.commands.executeCommand(
-          "setContext",
-          "berth.authenticated",
-          true,
-        );
+      return {
+        success: true,
+        message: "Authentication successful",
+        user: this.currentUser || undefined,
+      };
+    } catch (error: any) {
+      this.apiKey = null;
+      this.currentUser = null;
+      setAuthToken(undefined);
 
-        return {
-          success: true,
-          message: "Authentication successful",
-          user: this.currentUser || undefined,
-        };
-      } else {
-        this.apiKey = null;
-        this.currentUser = null;
-
-        const errorData = (await response.json()) as any;
+      if (error.response?.status === 401) {
         return {
           success: false,
           message:
-            errorData.message ||
+            error.response?.data?.message ||
             "Invalid API key. Please check your API key and try again.",
         };
       }
-    } catch (error) {
-      this.apiKey = null;
-      this.currentUser = null;
 
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -133,6 +120,7 @@ export class AuthService {
     try {
       this.currentUser = null;
       this.apiKey = null;
+      setAuthToken(undefined);
 
       await this.clearApiKeyFromStorage();
       await this.removeUserFromStorage();
@@ -145,6 +133,7 @@ export class AuthService {
     } catch (error) {
       this.currentUser = null;
       this.apiKey = null;
+      setAuthToken(undefined);
     }
   }
 
@@ -154,25 +143,20 @@ export class AuthService {
         return false;
       }
 
-      const apiClient = new ApiClient();
-      apiClient.setAuthToken(this.apiKey);
+      setAuthToken(this.apiKey);
 
-      const response = await apiClient.get("/api/v1/profile");
+      const response = await getApiV1Profile();
+      this.currentUser = response.data.data;
 
-      if (response.ok) {
-        const data = (await response.json()) as any;
-        this.currentUser = data;
-        if (this.currentUser) {
-          await this.saveUserToStorage(this.currentUser);
-        }
-        return true;
-      } else if (response.status === 401) {
+      if (this.currentUser) {
+        await this.saveUserToStorage(this.currentUser);
+      }
+      return true;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
         await this.logout();
         return false;
-      } else {
-        return false;
       }
-    } catch (error) {
       return false;
     }
   }
@@ -185,7 +169,7 @@ export class AuthService {
     await this.secretStorage.delete(AuthService.API_KEY_STORAGE_KEY);
   }
 
-  private async saveUserToStorage(user: User): Promise<void> {
+  private async saveUserToStorage(user: UserInfo): Promise<void> {
     await this.secretStorage.store(AuthService.USER_KEY, JSON.stringify(user));
   }
 
