@@ -64,7 +64,7 @@ export class FilesService {
     const response = await getApiV1ServersServeridStacksStacknameFiles(
       serverId,
       stackName,
-      path ? { path } : undefined,
+      path ? { filePath: path } : undefined,
     );
 
     const rawData = response.data;
@@ -103,7 +103,7 @@ export class FilesService {
     const response = await getApiV1ServersServeridStacksStacknameFilesRead(
       serverId,
       stackName,
-      { path },
+      { filePath: path },
     );
 
     const data = response.data;
@@ -207,7 +207,7 @@ export class FilesService {
       stackName,
       {
         file,
-        path: filePath,
+        filePath,
       },
     );
   }
@@ -221,7 +221,7 @@ export class FilesService {
     const response = await getApiV1ServersServeridStacksStacknameFilesDownload(
       serverId,
       stackName,
-      { path, filename },
+      { filePath: path, filename },
     );
     return response.data;
   }
@@ -263,7 +263,7 @@ export class FilesService {
     const response = await getApiV1ServersServeridStacksStacknameFilesStats(
       serverId,
       stackName,
-      path ? { path } : undefined,
+      path ? { filePath: path } : undefined,
     );
 
     const data = response.data;
