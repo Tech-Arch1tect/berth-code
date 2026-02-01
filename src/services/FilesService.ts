@@ -12,12 +12,7 @@ import {
   postApiV1ServersServeridStacksStacknameFilesChown,
   getApiV1ServersServeridStacksStacknameFilesStats,
 } from "berth-api-client/files/files";
-import type {
-  DirectoryListing as ApiDirectoryListing,
-  FileContent as ApiFileContent,
-  DirectoryStats as ApiDirectoryStats,
-  FileEntry as ApiFileEntry,
-} from "berth-api-client/models";
+import type { FileEntry as ApiFileEntry } from "berth-api-client/models";
 
 export interface FileEntry {
   name: string;
@@ -47,12 +42,12 @@ export interface FileContent {
 }
 
 export interface DirectoryStats {
-  totalFiles: number;
-  totalDirectories: number;
-  totalSize: number;
-  mostCommonMode?: string;
-  mostCommonOwner?: number;
-  mostCommonGroup?: number;
+  path: string;
+  mostCommonMode: string;
+  mostCommonOwner: number;
+  mostCommonGroup: number;
+  ownerName?: string;
+  groupName?: string;
 }
 
 export class FilesService {
@@ -67,7 +62,7 @@ export class FilesService {
       path ? { filePath: path } : undefined,
     );
 
-    const rawData = response.data;
+    const rawData = response.data.data;
 
     if (!rawData) {
       return { path: "", entries: [] };
@@ -106,7 +101,7 @@ export class FilesService {
       { filePath: path },
     );
 
-    const data = response.data;
+    const data = response.data.data;
     return {
       path: data.path,
       content: data.content,
@@ -266,14 +261,14 @@ export class FilesService {
       path ? { filePath: path } : undefined,
     );
 
-    const data = response.data;
+    const data = response.data.data;
     return {
-      totalFiles: data.total_files ?? 0,
-      totalDirectories: data.total_directories ?? 0,
-      totalSize: data.total_size ?? 0,
+      path: data.path,
       mostCommonMode: data.most_common_mode,
       mostCommonOwner: data.most_common_owner,
       mostCommonGroup: data.most_common_group,
+      ownerName: data.owner_name,
+      groupName: data.group_name,
     };
   }
 

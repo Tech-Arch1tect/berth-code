@@ -3,7 +3,7 @@ import { AuthService } from "../services/AuthService";
 import { setAuthToken } from "../lib/api";
 import { getApiV1Servers } from "berth-api-client/servers/servers";
 import { getApiV1ServersServeridStacks } from "berth-api-client/stacks/stacks";
-import type { ServerResponse, Stack as ApiStack } from "berth-api-client/models";
+import type { ServerInfo, Stack as ApiStack } from "berth-api-client/models";
 import { Server, Stack } from "../types";
 
 interface TreeDataProvider {
@@ -115,7 +115,7 @@ export class AuthCommands {
 
     try {
       const response = await getApiV1Servers();
-      const servers: Server[] = (response.data.servers || []).map((s: ServerResponse) => ({
+      const servers: Server[] = (response.data.data.servers || []).map((s: ServerInfo) => ({
         id: s.id,
         name: s.name,
         description: s.description || undefined,
@@ -169,7 +169,7 @@ export class AuthCommands {
 
     try {
       const response = await getApiV1ServersServeridStacks(currentServer.id);
-      const stacks: Stack[] = (response.data.stacks || []).map((s: ApiStack) => ({
+      const stacks: Stack[] = (response.data.data.stacks || []).map((s: ApiStack) => ({
         name: s.name,
         status: s.is_healthy ? "healthy" : "unhealthy",
         serverId: s.server_id,
@@ -224,8 +224,8 @@ export class AuthCommands {
           progress.report({ increment: 20, message: "Fetching servers..." });
 
           const serversResponse = await getApiV1Servers();
-          const servers: Server[] = (serversResponse.data.servers || []).map(
-            (s: ServerResponse) => ({
+          const servers: Server[] = (serversResponse.data.data.servers || []).map(
+            (s: ServerInfo) => ({
               id: s.id,
               name: s.name,
               description: s.description || undefined,
@@ -269,7 +269,7 @@ export class AuthCommands {
           const stacksResponse = await getApiV1ServersServeridStacks(
             selectedServerItem.server.id,
           );
-          const stacks: Stack[] = (stacksResponse.data.stacks || []).map(
+          const stacks: Stack[] = (stacksResponse.data.data.stacks || []).map(
             (s: ApiStack) => ({
               name: s.name,
               status: s.is_healthy ? "healthy" : "unhealthy",

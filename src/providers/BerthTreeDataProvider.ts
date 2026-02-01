@@ -3,7 +3,7 @@ import { AuthService } from "../services/AuthService";
 import { FilesService } from "../services/FilesService";
 import { getApiV1Servers } from "berth-api-client/servers/servers";
 import { getApiV1ServersServeridStacks } from "berth-api-client/stacks/stacks";
-import type { ServerResponse, Stack as ApiStack } from "berth-api-client/models";
+import type { ServerInfo, Stack as ApiStack } from "berth-api-client/models";
 import {
   Server,
   Stack,
@@ -727,7 +727,7 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
   private async getServers(): Promise<BerthTreeItemImpl[]> {
     try {
       const response = await getApiV1Servers();
-      const servers: Server[] = (response.data.servers || []).map((s: ServerResponse) => ({
+      const servers: Server[] = (response.data.data.servers || []).map((s: ServerInfo) => ({
         id: s.id,
         name: s.name,
         description: s.description || undefined,
@@ -767,7 +767,7 @@ export class BerthTreeDataProvider implements vscode.TreeDataProvider<BerthTreeI
   private async getStacks(server: Server): Promise<BerthTreeItemImpl[]> {
     try {
       const response = await getApiV1ServersServeridStacks(server.id);
-      const stacks: Stack[] = (response.data.stacks || []).map((s: ApiStack) => ({
+      const stacks: Stack[] = (response.data.data.stacks || []).map((s: ApiStack) => ({
         name: s.name,
         status: s.is_healthy ? "healthy" : "unhealthy",
         serverId: s.server_id,

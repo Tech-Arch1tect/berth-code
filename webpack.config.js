@@ -25,9 +25,6 @@ const extensionConfig = {
   },
   resolve: {
     extensions: ['.ts', '.js'],
-    alias: {
-      [path.resolve(__dirname, 'lib/api')]: path.resolve(__dirname, 'src/lib/api.ts'),
-    }
   },
   module: {
     rules: [
