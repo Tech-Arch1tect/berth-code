@@ -2,7 +2,7 @@
   "name": "berth-code",
   "displayName": "Berth Stack Manager",
   "description": "Manage Docker stack files and configurations through Berth server",
-  "version": "0.0.1",
+  "version": "0.4.1",
   "publisher": "berth",
   "engines": {
     "vscode": "^1.104.0"
