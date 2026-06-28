@@ -1,4 +1,4 @@
-export type { UserInfo, RoleInfo } from "berth-api-client/models";
+export type { UserInfo, RoleInfo } from "berth-api-client/generated/models";
 
 import type { FileEntry as FileEntryType } from "../services/FilesService";
 export type FileEntry = FileEntryType;

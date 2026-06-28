@@ -2,7 +2,7 @@
   "name": "berth-code",
   "displayName": "Berth Stack Manager",
   "description": "Manage Docker stack files and configurations through Berth server",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "berth",
   "engines": {
     "vscode": "^1.104.0"
@@ -262,7 +262,7 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
-    "berth-api-client": "git+https://github.com/Tech-Arch1tect/berth-api-client.git"
+    "berth-api-client": "github:Tech-Arch1tect/berth-api-client#f7eb75e1b829ed67135702206cf30f5369aea9cd"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.79.0",

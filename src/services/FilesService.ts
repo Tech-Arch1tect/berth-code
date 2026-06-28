@@ -11,8 +11,8 @@ import {
   postApiV1ServersServeridStacksStacknameFilesChmod,
   postApiV1ServersServeridStacksStacknameFilesChown,
   getApiV1ServersServeridStacksStacknameFilesStats,
-} from "berth-api-client/files/files";
-import type { FileEntry as ApiFileEntry } from "berth-api-client/models";
+} from "berth-api-client/generated/files/files";
+import type { FileEntry as ApiFileEntry } from "berth-api-client/generated/models";
 
 export interface FileEntry {
   name: string;
@@ -62,7 +62,7 @@ export class FilesService {
       path ? { filePath: path } : undefined,
     );
 
-    const rawData = response.data.data;
+    const rawData = response.data;
 
     if (!rawData) {
       return { path: "", entries: [] };
@@ -101,7 +101,7 @@ export class FilesService {
       { filePath: path },
     );
 
-    const data = response.data.data;
+    const data = response.data;
     return {
       path: data.path,
       content: data.content,
@@ -218,7 +218,7 @@ export class FilesService {
       stackName,
       { filePath: path, filename },
     );
-    return response.data;
+    return response;
   }
 
   public async chmodFile(
@@ -261,7 +261,7 @@ export class FilesService {
       path ? { filePath: path } : undefined,
     );
 
-    const data = response.data.data;
+    const data = response.data;
     return {
       path: data.path,
       mostCommonMode: data.most_common_mode,

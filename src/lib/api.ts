@@ -1,6 +1,7 @@
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosRequestConfig } from "axios";
 import * as vscode from "vscode";
 import * as https from "https";
+import { configureApiClient, type FetchLike } from "berth-api-client/client";
 
 let authToken: string | undefined;
 
@@ -25,54 +26,71 @@ function createAxiosInstance() {
   );
   const customHeaders = config.get<Record<string, string>>("customHeaders", {});
 
-  const instance = axios.create({
+  return axios.create({
     baseURL,
     headers: {
-      "Content-Type": "application/json",
       ...customHeaders,
     },
     httpsAgent: trustSelfSigned
       ? new https.Agent({ rejectUnauthorized: false })
       : undefined,
   });
-
-  instance.interceptors.request.use((reqConfig) => {
-    if (authToken) {
-      reqConfig.headers["Authorization"] = `Bearer ${authToken}`;
-    }
-    return reqConfig;
-  });
-
-  return instance;
 }
 
 let axiosInstance = createAxiosInstance();
+
+function headersToObject(
+  headers: RequestInit["headers"],
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!headers) {
+    return result;
+  }
+  if (headers instanceof Headers) {
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+  } else if (Array.isArray(headers)) {
+    for (const [key, value] of headers) {
+      result[key] = value;
+    }
+  } else {
+    Object.assign(result, headers);
+  }
+  return result;
+}
+
+const axiosFetch: FetchLike = async (input, init) => {
+  const config: AxiosRequestConfig = {
+    url: input,
+    method: init?.method ?? "GET",
+    headers: headersToObject(init?.headers),
+    data: init?.body,
+    responseType: "arraybuffer",
+    validateStatus: () => true,
+  };
+
+  const response = await axiosInstance.request<ArrayBuffer>(config);
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(response.headers)) {
+    if (typeof value === "string") {
+      headers.set(key, value);
+    }
+  }
+
+  const hasNoBody = [204, 205, 304].includes(response.status);
+  const body = hasNoBody ? null : Buffer.from(response.data);
+  return new Response(body, { status: response.status, headers });
+};
+
+configureApiClient({
+  fetch: axiosFetch,
+  getAccessToken: () => authToken ?? null,
+});
 
 vscode.workspace.onDidChangeConfiguration((e) => {
   if (e.affectsConfiguration("berth")) {
     axiosInstance = createAxiosInstance();
   }
 });
-
-export const apiClient = <T>(
-  config: AxiosRequestConfig,
-): Promise<AxiosResponse<T>> => {
-  if (config.responseType === "blob") {
-    return axiosInstance
-      .request<Buffer>({ ...config, responseType: "arraybuffer" })
-      .then((response) => {
-        const data = response.data;
-        const uint8Array = new Uint8Array(
-          data.buffer,
-          data.byteOffset,
-          data.byteLength,
-        );
-        const blob = new Blob([uint8Array]);
-        return {
-          ...response,
-          data: blob as unknown as T,
-        };
-      });
-  }
-  return axiosInstance.request<T>(config);
-};

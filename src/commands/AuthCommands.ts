@@ -1,9 +1,12 @@
 import * as vscode from "vscode";
 import { AuthService } from "../services/AuthService";
 import { setAuthToken } from "../lib/api";
-import { getApiV1Servers } from "berth-api-client/servers/servers";
-import { getApiV1ServersServeridStacks } from "berth-api-client/stacks/stacks";
-import type { ServerInfo, Stack as ApiStack } from "berth-api-client/models";
+import { getApiV1Servers } from "berth-api-client/generated/servers/servers";
+import { getApiV1ServersServeridStacks } from "berth-api-client/generated/stacks/stacks";
+import type {
+  ServerInfo,
+  Stack as ApiStack,
+} from "berth-api-client/generated/models";
 import { Server, Stack } from "../types";
 
 interface TreeDataProvider {
@@ -115,14 +118,16 @@ export class AuthCommands {
 
     try {
       const response = await getApiV1Servers();
-      const servers: Server[] = (response.data.data.servers || []).map((s: ServerInfo) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description || undefined,
-        host: s.host,
-        port: s.port,
-        status: s.is_active ? "active" : "inactive",
-      }));
+      const servers: Server[] = (response.data.servers || []).map(
+        (s: ServerInfo) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || undefined,
+          host: s.host,
+          port: s.port,
+          status: s.is_active ? "active" : "inactive",
+        }),
+      );
 
       if (servers.length === 0) {
         vscode.window.showInformationMessage("No servers available");
@@ -169,11 +174,13 @@ export class AuthCommands {
 
     try {
       const response = await getApiV1ServersServeridStacks(currentServer.id);
-      const stacks: Stack[] = (response.data.data.stacks || []).map((s: ApiStack) => ({
-        name: s.name,
-        status: s.is_healthy ? "healthy" : "unhealthy",
-        serverId: s.server_id,
-      }));
+      const stacks: Stack[] = (response.data.stacks || []).map(
+        (s: ApiStack) => ({
+          name: s.name,
+          status: s.is_healthy ? "healthy" : "unhealthy",
+          serverId: s.server_id,
+        }),
+      );
 
       if (stacks.length === 0) {
         vscode.window.showInformationMessage(
@@ -224,7 +231,7 @@ export class AuthCommands {
           progress.report({ increment: 20, message: "Fetching servers..." });
 
           const serversResponse = await getApiV1Servers();
-          const servers: Server[] = (serversResponse.data.data.servers || []).map(
+          const servers: Server[] = (serversResponse.data.servers || []).map(
             (s: ServerInfo) => ({
               id: s.id,
               name: s.name,
@@ -269,7 +276,7 @@ export class AuthCommands {
           const stacksResponse = await getApiV1ServersServeridStacks(
             selectedServerItem.server.id,
           );
-          const stacks: Stack[] = (stacksResponse.data.data.stacks || []).map(
+          const stacks: Stack[] = (stacksResponse.data.stacks || []).map(
             (s: ApiStack) => ({
               name: s.name,
               status: s.is_healthy ? "healthy" : "unhealthy",
