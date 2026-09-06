@@ -262,7 +262,7 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
-    "berth-api-client": "github:Tech-Arch1tect/berth-api-client#f7eb75e1b829ed67135702206cf30f5369aea9cd"
+    "berth-api-client": "github:Tech-Arch1tect/berth-api-client#285a876b03a94ded9aad848f06457969ca728786"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.79.0",
